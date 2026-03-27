@@ -1,0 +1,30 @@
+{
+	"name": "mcp-inspector-bridge",
+	"version": "0.0.1",
+	"description": "Modern Cocos Inspector Bridge using TypeScript and Vue 3",
+	"author": "Firekula",
+	"main": "dist/main.js",
+	"scripts": {
+		"build": "tsc",
+		"watch": "tsc -w"
+	},
+	"main-menu": {
+		"i18n:MAIN_MENU.package.title/mcp-inspector-bridge/open": {
+			"message": "mcp-inspector-bridge:open"
+		}
+	},
+	"panel": {
+		"main": "dist/panel/index.js",
+		"type": "dockable",
+		"title": "mcp-inspector-bridge",
+		"width": 800,
+		"height": 600
+	},
+	"devDependencies": {
+		"@types/node": "^25.5.0",
+		"typescript": "^6.0.2"
+	},
+	"dependencies": {
+		"vue": "^3.5.31"
+	}
+}

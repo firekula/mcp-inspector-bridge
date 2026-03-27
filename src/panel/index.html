@@ -1,0 +1,147 @@
+<style>
+/* CSS Reset for extension panel */
+#app { width: 100%; height: 100%; display: flex; background: #2b2b2b; color: #ccc; font-family: sans-serif; overflow: hidden; }
+.tab-nav { display: flex; background: #1e1e1e; border-bottom: 1px solid #000; font-size: 13px; }
+.tab-item { padding: 8px 15px; cursor: pointer; border-right: 1px solid #333; }
+.tab-item:hover { background: #2a2a2a; }
+.tab-item.active { background: #3c3c3c; color: #fff; font-weight: bold; border-top: 2px solid #09f; }
+.btn-group { display: flex; gap: 5px; }
+.icon-btn { background: transparent; border: 1px solid #555; color: #ccc; cursor: pointer; padding: 4px 8px; border-radius: 3px; font-size: 12px; }
+.icon-btn:hover { background: #555; color: #fff; }
+
+/* Split Pane Divider */
+.resizer {
+    width: 6px;
+    background: #333;
+    cursor: col-resize;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-left: 1px solid #111;
+    border-right: 1px solid #111;
+    z-index: 100;
+}
+.resizer:hover { background: #4a4a4a; }
+.resizer::after {
+    content: "⋮";
+    color: #888;
+    font-size: 14px;
+}
+</style>
+
+<div id="app" v-cloak>
+    <!-- 左侧 Game Panel -->
+    <div style="flex: 1; display: flex; flex-direction: column; border-right: 1px solid #111; overflow: hidden;">
+        <!-- 顶部操作栏 -->
+        <div style="height: 35px; background: #3c3c3c; display: flex; align-items: center; padding: 0 10px; gap: 10px;">
+            <div class="btn-group">
+                <button class="icon-btn" title="刷新页面" @click="refreshGame">↻ 刷新</button>
+                <button class="icon-btn" title="暂停/恢复引擎" @click="togglePause">⏸ 暂停</button>
+                <button class="icon-btn" title="单帧运行" @click="stepGame">⏭ 单帧</button>
+                <button class="icon-btn" title="开关FPS面板" @click="toggleFPS">📉 FPS</button>
+                <!-- <button class="icon-btn" title="场景节点选择" @click="toggleSelector">🎯 选取器</button> -->
+            </div>
+            <!-- 分辨率限制控件 -->
+            <select v-model="selectedResolution" style="background:#555; color:#fff; border:1px solid #777; padding:3px; outline:none; border-radius:3px;">
+                <option value="FIT">自动充满 (Fit Window)</option>
+                <option value="750x1334">Apple iPhone 7 (750x1334)</option>
+                <option value="1125x2436">Apple iPhone X (1125x2436)</option>
+                <option value="1080x1920">Android 1080p (1080x1920)</option>
+                <option value="1284x2778">Apple iPhone 12 Pro Max (1284x2778)</option>
+            </select>
+            <button class="icon-btn" title="横竖屏切换" @click="rotateScreen">🔄 旋转</button>
+            <div style="flex: 1;"></div>
+            <div style="font-size: 12px; color: #aaa;">MCP Bridge</div>
+        </div>
+
+        <!-- 游戏 Webview 容器底板 (深渊灰色，负责居中缩放) -->
+        <div id="game-mount-wrap" ref="wrapMount" style="flex: 1; background: #1a1a1c; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative;">
+            
+            <!-- 被严格限制特定分辨率比例的物理容器 -->
+            <div :style="gameContainerStyle" style="background: #000; box-shadow: 0 0 20px rgba(0,0,0,0.8); flex-shrink: 0; display: flex; transition: all 0.2s ease-out;">
+                <!-- 携带特权的 Webview -->
+                <webview id="game-view" ref="gameView"
+                    preload="PRELOAD_PLACEHOLDER"
+                    src="http://localhost:7456"
+                    disablewebsecurity="true"
+                    partition="persist:game"
+                    nodeintegrationinsubframes="true"
+                    webpreferences="contextIsolation=false"
+                    style="width: 100%; height: 100%; border: none; display: flex; flex: 1; background:#000;">
+                </webview>
+                <!-- 拖动时的屏蔽罩，防止 webview 吞噬鼠标事件 -->
+                <div v-show="isDragging" style="position: absolute; inset: 0; background: transparent; z-index: 999;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 拖曳调整宽度的竖向手柄 -->
+    <div class="resizer" @mousedown="startDrag"></div>
+
+    <!-- 右侧 Tabs Panel (固定或弹性宽度) -->
+    <div :style="{ width: rightPanelWidth + 'px', flexShrink: 0, display: 'flex', flexDirection: 'column', background: '#252525' }">
+        
+        <!-- Tab 切换菜单 -->
+        <div class="tab-nav">
+            <div :class="['tab-item', activeTab === 0 ? 'active' : '']" @click="activeTab = 0">🌲 main</div>
+            <div :class="['tab-item', activeTab === 1 ? 'active' : '']" @click="activeTab = 1">🛠 开发者工具</div>
+            <div :class="['tab-item', activeTab === 2 ? 'active' : '']" @click="activeTab = 2">ℹ️ Cocos信息</div>
+            <div :class="['tab-item', activeTab === 3 ? 'active' : '']" @click="activeTab = 3">🔌 扩展</div>
+        </div>
+
+        <!-- 内容渲染层 -->
+        <div style="flex: 1; position: relative;">
+            
+            <!-- Tab 0: Node Tree & Props -->
+            <div v-show="activeTab === 0" style="position: absolute; inset: 0; display: flex; flex-direction: column;">
+                <div v-if="globalState.isFallbackMode" style="padding: 10px; background: #fff3e0; color: #ef6c00; font-size: 11px; border-bottom: 1px solid #ffe0b2;">
+                    ⚠️ [降级容错模式] 原生 IPC 数据链路受阻，当前面板正通过主动 DOM 轮询模式拉取。
+                </div>
+                <div style="flex: 4; display: flex; flex-direction: column; overflow-y: auto; padding: 10px; border-bottom: 1px solid #444;">
+                    <div v-if="!globalState.nodeTree" style="color: #666; font-size: 12px; text-align: center; margin-top: 50px;">(等待加载场景节点树)</div>
+                    <div v-else>
+                        <pre style="font-size: 11px; color:#aaa; margin:0;" v-html="JSON.stringify(globalState.nodeTree, null, 2).substring(0, 1000) + '\n... (省略显示)'"></pre>
+                    </div>
+                </div>
+                <div style="flex: 6; overflow-y: auto; padding: 10px; background: #202020;">
+                    <div style="font-weight: bold; margin-bottom: 5px; color: #888;">组件属性 (Properties)</div>
+                    <div style="color: #555; font-size: 12px;">选中左侧节点...</div>
+                </div>
+            </div>
+
+            <div :style="{
+                position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: '#1e1e1e',
+                visibility: activeTab === 1 ? 'visible' : 'hidden',
+                zIndex: activeTab === 1 ? 10 : -1,
+                pointerEvents: activeTab === 1 ? 'auto' : 'none',
+                opacity: activeTab === 1 ? 1 : 0
+            }">
+                <div v-if="globalState.devToolsError" style="padding: 15px; background: #ffebee; color: #c62828; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffcdd2;">
+                    ⚠️ DevTools 挂载异常: {{ globalState.devToolsError }}
+                    <div style="font-weight: normal; font-size: 11px; margin-top: 5px; color: #555;">(内嵌模式不可用，请尝试独立窗口)</div>
+                    <button @click="openDevToolsExternal" style="margin-top: 8px; padding: 4px 12px; background: #1976d2; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">🔧 在独立窗口中打开 DevTools</button>
+                </div>
+                <!-- Phase 7: BrowserView 占位 div，BrowserView 将覆盖此区域 -->
+                <div ref="devtoolsView" style="width: 100%; flex: 1; background: #242424; display: flex; align-items: center; justify-content: center; color: #666; font-size: 13px;">
+                    <span v-if="!globalState.devToolsError">DevTools 加载中...</span>
+                </div>
+            </div>
+
+            <!-- Tab 2/3: 辅助页 -->
+            <div v-show="activeTab === 2" style="position: absolute; inset: 0; padding: 15px;">
+                <h4>Cocos 运行环境</h4>
+                <div v-if="!globalState.cocosInfo" style="font-size: 12px; color:#aaa;">等待握手...</div>
+                <ul v-else style="font-size: 13px; color: #bbb;">
+                    <li>Cocos 版本: {{ globalState.cocosInfo.version }}</li>
+                    <li>原生环境: {{ globalState.cocosInfo.isNative }}</li>
+                    <li>移动设备: {{ globalState.cocosInfo.isMobile }}</li>
+                    <li>语言模式: {{ globalState.cocosInfo.language }}</li>
+                </ul>
+            </div>
+            <div v-show="activeTab === 3" style="position: absolute; inset: 0; padding: 15px;">
+                <h4>第三方扩展</h4>
+            </div>
+
+        </div>
+    </div>
+</div>

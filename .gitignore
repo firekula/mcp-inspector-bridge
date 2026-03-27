@@ -1,0 +1,32 @@
+# Dependency directories
+node_modules/
+
+tools/
+
+# Compiled and build output
+dist/
+*.js.map
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS Configuration
+.DS_Store
+Thumbs.db
+
+# Reverse Engineering Scripts
+tools/
+
+# Local Project Specifications
+specs/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# IDE and Editor
+.vscode/
+.idea/
