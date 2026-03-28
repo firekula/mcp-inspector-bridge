@@ -441,7 +441,6 @@ module.exports = Editor.Panel.extend({
                 watch(activeTab, async (newVal: number) => {
                     if (newVal === 1 && !isDevToolsSetup) {
                         await nextTick();
-                        Editor.info('[Bridge-P7] activeTab === 1，启动 Phase 7 BrowserView 方案...');
 
                         // 等待游戏的 WebContents ID 就绪
                         let attempts = 0;
@@ -454,7 +453,6 @@ module.exports = Editor.Panel.extend({
                             if (attempts > 150) {
                                 clearInterval(captureInterval);
                                 globalState.devToolsError = 'BrowserView: 游戏 WebContents 获取超时';
-                                Editor.error('[Bridge-P7] 失败：超时。');
                                 return;
                             }
 
@@ -472,7 +470,6 @@ module.exports = Editor.Panel.extend({
                                     return;
                                 }
 
-                                Editor.info(`[Bridge-P7] 游戏 WebContents ID: ${gid}，开始创建 BrowserView...`);
 
                                 // 创建 BrowserView（完全模仿原版 CocosInspector）
                                 const currentWindow = remote.getCurrentWindow();
@@ -492,17 +489,15 @@ module.exports = Editor.Panel.extend({
                                 gWC.setDevToolsWebContents(bvWC);
                                 gWC.openDevTools();
 
-                                Editor.info('[Bridge-P7] √ setDevToolsWebContents + openDevTools 执行完毕！');
 
                                 // 定位 BrowserView
                                 updateBrowserViewBounds();
 
                                 isDevToolsSetup = true;
                                 globalState.devToolsError = null;
-                                Editor.info('[Bridge-P7] √ BrowserView DevTools 挂载完成！');
 
                             } catch (e: any) {
-                                Editor.error('[Bridge-P7] 异常: ' + e.message);
+                                Editor.error('[Bridge] 异常: ' + e.message);
                             }
                         }, 20);
                     }
