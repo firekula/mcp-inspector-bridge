@@ -100,8 +100,25 @@ export const NodeInspector = {
                                     <!-- Number -->
                                     <input v-else-if="prop.type === 'number'" type="number" step="0.1" :value="formatNumber(prop.value)" @change="onUpdateProp(comp.name, prop.key, parseFloat($event.target.value), comp.realIndex)" style="width: 100%; box-sizing: border-box; padding: 2px 4px; background: #1e1e1e; color: #fff; border: 1px solid #444; border-radius: 2px;" />
                                     
-                                    <!-- String -->
-                                    <input v-else-if="prop.type === 'string'" type="text" :value="prop.value" @change="onUpdateProp(comp.name, prop.key, $event.target.value, comp.realIndex)" style="width: 100%; box-sizing: border-box; padding: 2px 4px; background: #1e1e1e; color: #fff; border: 1px solid #444; border-radius: 2px;" />
+                                    <!-- String / Enum -->
+                                    <template v-else-if="prop.type === 'string'">
+                                        <select v-if="prop.enumList" :value="prop.value || '<None>'" @change="onUpdateProp(comp.name, prop.key, $event.target.value === '<None>' ? '' : $event.target.value, comp.realIndex)" style="width: 100%; box-sizing: border-box; padding: 2px 4px; background: #1e1e1e; color: #fff; border: 1px solid #444; border-radius: 2px;">
+                                            <option v-for="opt in prop.enumList" :key="opt" :value="opt">{{ opt }}</option>
+                                        </select>
+                                        <input v-else type="text" :value="prop.value" @change="onUpdateProp(comp.name, prop.key, $event.target.value, comp.realIndex)" style="width: 100%; box-sizing: border-box; padding: 2px 4px; background: #1e1e1e; color: #fff; border: 1px solid #444; border-radius: 2px;" />
+                                    </template>
+                                    
+                                    <!-- Node Ref -->
+                                    <div v-else-if="prop.type === 'node_ref'" style="display: flex; align-items: center; background: #1a1a1a; border: 1px solid #3a3a3a; border-radius: 2px; padding: 2px;">
+                                        <span style="font-size: 10px; color:#4fa1ff; padding: 0 4px;">Node</span>
+                                        <input type="text" disabled :value="prop.value.name" style="flex: 1; min-width: 0; background: transparent; color: #aaa; border: none; font-size: 11px; padding: 2px;" :title="prop.value.uuid"/>
+                                    </div>
+
+                                    <!-- Asset Ref -->
+                                    <div v-else-if="prop.type === 'asset_ref'" style="display: flex; align-items: center; background: #1a1a1a; border: 1px solid #3a3a3a; border-radius: 2px; padding: 2px;">
+                                        <span style="font-size: 10px; color:#cda34f; padding: 0 4px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; max-width: 80px;" :title="prop.value.className">[{{ prop.value.className }}]</span>
+                                        <input type="text" disabled :value="prop.value.name" style="flex: 1; min-width: 0; background: transparent; color: #aaa; border: none; font-size: 11px; padding: 2px;" :title="prop.value.uuid"/>
+                                    </div>
                                     
                                     <!-- Array -->
                                     <div v-else-if="prop.type === 'array'" style="display: flex; flex-direction: column; width: 100%; gap: 4px;">

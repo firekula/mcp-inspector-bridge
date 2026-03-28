@@ -5,6 +5,9 @@
 ## [0.0.2] - 2026-03-28
 
 ### ✨ 新特性与架构变更
+- **全局引擎资源解析与下拉控件拓展 (Global Asset Crawler & Dynamic Dropdowns)**:
+  - 重组了 `typeof val === "object"` 的前端爬虫逻辑拦截网，打破了之前只有 `cc.Node` 才能被记录的限制，现已开放并全局接管了所有派生自 `cc.Asset` 的骨骼、纹理和音频等各类素材引用。在属性列表内以带有类名前缀的专属样式（`asset_ref`）安全呈现，彻底弥合因复杂数据类型退化导致的属性显示盲地。
+  - **Spine 针对性体验升维**：自 `sp.SkeletonData` 突破封锁正常上报后，爬虫脚本更进一步发起了向其内部数据源 `getRuntimeData()` 的向下窥探，精准提炼出引擎已实例化的动画与皮肤表单，合成并随对象抛出 `enumList` 枚举。前台拦截此附加标记后，完美将 `defaultSkin` 与 `animation` 从危险且盲目的 `<input>` 型文本录板，涅槃重生为极度安全的下拉甄选器（`<select>`），体验全面比肩甚至超越原生系统。
 - **纯运行时级数据注入 (Pure Runtime Data Injection)**:
   - 彻底移除了原先基于 Editor IPC（`scene-script.js` 和 Undo Group）的属性跨进程修改架构。
   - 现在 Inspector 的所有属性修改（包括节点 Transform 和所有 Components）将完全绕过编辑器序列化管线，通过在 `gameView` (Webview) 中原生执行 JavaScript 直接对内存中的 `cc.Node` 与 `cc.Component` 实例进行赋值。

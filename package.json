@@ -13,6 +13,7 @@
 			"message": "mcp-inspector-bridge:open"
 		}
 	},
+	"scene-script": "dist/scene-script.js",
 	"panel": {
 		"main": "dist/panel/index.js",
 		"type": "dockable",
