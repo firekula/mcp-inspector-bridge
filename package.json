@@ -9,7 +9,7 @@
 		"watch": "tsc -w"
 	},
 	"main-menu": {
-		"i18n:MAIN_MENU.package.title/mcp-inspector-bridge/open": {
+		"MCP 桥接器/开启运行时面板": {
 			"message": "mcp-inspector-bridge:open"
 		}
 	},
@@ -17,7 +17,7 @@
 	"panel": {
 		"main": "dist/panel/index.js",
 		"type": "dockable",
-		"title": "mcp-inspector-bridge",
+		"title": "运行时面板",
 		"width": 800,
 		"height": 600
 	},

@@ -57,7 +57,7 @@ mark { background: #0078d4; color: white; padding: 0 2px; border-radius: 2px;}
         <div style="height: 35px; background: #3c3c3c; display: flex; align-items: center; padding: 0 10px; gap: 10px;">
             <div class="btn-group">
                 <button class="icon-btn" title="刷新页面" @click="refreshGame">↻ 刷新</button>
-                <button class="icon-btn" title="暂停/恢复引擎" @click="togglePause">⏸ 暂停</button>
+                <button class="icon-btn" title="暂停/恢复引擎" @click="togglePause">{{ globalState.isGamePaused ? '▶️ 播放' : '⏸ 暂停' }}</button>
                 <button class="icon-btn" title="单帧运行" @click="stepGame">⏭ 单帧</button>
                 <button class="icon-btn" title="开关FPS面板" @click="toggleFPS">📉 FPS</button>
                 <!-- <button class="icon-btn" title="场景节点选择" @click="toggleSelector">🎯 选取器</button> -->
@@ -79,7 +79,7 @@ mark { background: #0078d4; color: white; padding: 0 2px; border-radius: 2px;}
         <div id="game-mount-wrap" ref="wrapMount" style="flex: 1; background: #1a1a1c; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative;">
             
             <!-- 被严格限制特定分辨率比例的物理容器 -->
-            <div :style="gameContainerStyle" style="background: #000; box-shadow: 0 0 20px rgba(0,0,0,0.8); flex-shrink: 0; display: flex; transition: all 0.2s ease-out; overflow: hidden;">
+            <div :style="gameContainerStyle" style="background: #000; box-shadow: 0 0 20px rgba(0,0,0,0.8); flex-shrink: 0; display: flex; transition: transform 0.2s ease-out; overflow: hidden;">
                 <!-- 携带特权的 Webview -->
                 <webview id="game-view" ref="gameView"
                     preload="PRELOAD_PLACEHOLDER"

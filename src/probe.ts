@@ -49,7 +49,8 @@
         if (!scene) return;
         
         const treeData = serializeNode(scene);
-        window.__mcpInspector.updateTree(JSON.stringify(treeData));
+        const pauseStatus = (typeof cc.game !== 'undefined' && cc.game.isPaused) ? cc.game.isPaused() : false;
+        window.__mcpInspector.updateTree(JSON.stringify({ tree: treeData, isPaused: pauseStatus }));
     }
     
     function serializeNode(node) {

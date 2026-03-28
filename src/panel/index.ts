@@ -32,7 +32,8 @@ module.exports = Editor.Panel.extend({
             lastTreeUpdate: 0 as number,
             isFallbackMode: false as boolean,
             devToolsError: null as string | null,
-            nodeDetail: null as any
+            nodeDetail: null as any,
+            isGamePaused: false as boolean
         });
 
         const app = createApp({
@@ -203,14 +204,18 @@ module.exports = Editor.Panel.extend({
                     if (wrap) {
                         try {
                             new ResizeObserver(entries => {
+                                if (entries[0].contentRect.width <= 0 || entries[0].contentRect.height <= 0) return;
                                 wrapperSize.value.width = entries[0].contentRect.width;
                                 wrapperSize.value.height = entries[0].contentRect.height;
                             }).observe(wrap);
                         } catch (e) {
                             // Electron 版本过低兜底
-                            wrapperSize.value.width = wrap.clientWidth;
-                            wrapperSize.value.height = wrap.clientHeight;
+                            if (wrap.clientWidth > 0 && wrap.clientHeight > 0) {
+                                wrapperSize.value.width = wrap.clientWidth;
+                                wrapperSize.value.height = wrap.clientHeight;
+                            }
                             window.addEventListener('resize', () => {
+                                if (wrap.clientWidth <= 0 || wrap.clientHeight <= 0) return;
                                 wrapperSize.value.width = wrap.clientWidth;
                                 wrapperSize.value.height = wrap.clientHeight;
                             });
@@ -233,7 +238,13 @@ module.exports = Editor.Panel.extend({
                                 globalState.cocosInfo = event.args[0];
                             } else if (event.channel === 'update-tree') {
                                 try {
-                                    globalState.nodeTree = JSON.parse(event.args[0]);
+                                    const parsed = JSON.parse(event.args[0]);
+                                    if (parsed && typeof parsed.tree !== 'undefined') {
+                                        globalState.nodeTree = parsed.tree;
+                                        globalState.isGamePaused = !!parsed.isPaused;
+                                    } else {
+                                        globalState.nodeTree = parsed;
+                                    }
                                     globalState.lastTreeUpdate = Date.now();
                                 } catch (e) { }
                             }
@@ -293,7 +304,8 @@ module.exports = Editor.Panel.extend({
                                                 if (eng && eng.director) {
                                                     var scene = eng.director.getScene();
                                                     if (scene) {
-                                                        var result = { tree: serializeNode(scene), version: eng.ENGINE_VERSION };
+                                                        var isP = (eng.game && typeof eng.game.isPaused === 'function') ? eng.game.isPaused() : false;
+                                                        var result = { tree: serializeNode(scene), version: eng.ENGINE_VERSION, isPaused: isP };
                                                         return JSON.stringify(result);
                                                     }
                                                 }
@@ -309,6 +321,9 @@ module.exports = Editor.Panel.extend({
                                                 try {
                                                     const parsed = JSON.parse(result);
                                                     globalState.nodeTree = parsed.tree;
+                                                    if (parsed.isPaused !== undefined) {
+                                                        globalState.isGamePaused = !!parsed.isPaused;
+                                                    }
                                                     if (parsed.version && !globalState.cocosInfo) {
                                                         globalState.cocosInfo = { version: parsed.version, isNative: false, isMobile: false, language: 'unknown (fallback)' };
                                                     }
@@ -508,6 +523,7 @@ module.exports = Editor.Panel.extend({
 
                 const rotateScreen = () => { isLandscape.value = !isLandscape.value; };
                 const refreshGame = () => {
+                    globalState.isGamePaused = false;
                     const wv: any = gameView.value;
                     if (wv) wv.reload();
                 };
@@ -527,6 +543,7 @@ module.exports = Editor.Panel.extend({
                                     if ('${command}' === 'pause') {
                                         if (eng.game.isPaused()) eng.game.resume(); else eng.game.pause();
                                     } else if ('${command}' === 'step') {
+                                        if (!eng.game.isPaused()) eng.game.pause();
                                         eng.game.step();
                                     } else if ('${command}' === 'fps') {
                                         eng.debug.setDisplayStats(!eng.debug.isDisplayStats());
@@ -539,8 +556,8 @@ module.exports = Editor.Panel.extend({
                     else Editor.warn('[Bridge] 找不到 game-view，宏发送失败');
                 };
 
-                const togglePause = () => { executeMacro('pause'); };
-                const stepGame = () => { executeMacro('step'); };
+                const togglePause = () => { globalState.isGamePaused = !globalState.isGamePaused; executeMacro('pause'); };
+                const stepGame = () => { globalState.isGamePaused = true; executeMacro('step'); };
                 const toggleFPS = () => { executeMacro('fps'); };
 
                 // 回退方案：在独立窗口中打开 DevTools
