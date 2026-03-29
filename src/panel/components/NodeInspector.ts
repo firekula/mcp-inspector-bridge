@@ -8,16 +8,11 @@ export const NodeInspector = {
             default: null
         }
     },
-    emits: ['update-prop', 'toggle-debug'],
+    emits: ['update-prop', 'hover-change'],
     template: `
-        <div class="node-inspector-wrap" style="padding: 10px; overflow-y: auto; height: 100%; color: #d0d0d0;">
-            <div style="display: flex; justify-content: flex-end; margin-bottom: 5px;">
-                <label style="font-size: 10px; color: #888; cursor: pointer; display: flex; align-items: center;">
-                    <input type="checkbox" @change="onToggleDebug($event.target.checked)" style="margin: 0 4px 0 0;" />
-                    调试提取日志 (Crawler Debug)
-                </label>
-            </div>
-            
+        <div class="node-inspector-wrap" style="padding: 10px; overflow-y: auto; height: 100%; color: #d0d0d0;"
+             @mouseenter="onHover(true)" @mouseleave="onHover(false)">
+
             <div v-if="!nodeDetail" class="empty-hint" style="text-align: center; margin-top: 50px; color: #888;">
                 未选中任何节点 (No node selected)
             </div>
@@ -190,8 +185,8 @@ export const NodeInspector = {
             });
         };
 
-        const onToggleDebug = (checked: boolean) => {
-            emit('toggle-debug', checked);
+        const onHover = (hovering: boolean) => {
+            emit('hover-change', hovering);
         };
 
         const formatNumber = (val: number | string | undefined) => {
@@ -204,7 +199,7 @@ export const NodeInspector = {
             expandedComps,
             toggleComp,
             onUpdateProp,
-            onToggleDebug,
+            onHover,
             formatNumber
         };
     }

@@ -11,6 +11,9 @@ const templateRaw = fs.readFileSync(path.join(__dirname, '../../src/panel/index.
 const preloadUrlResolved = 'file:///' + Editor.url('packages://mcp-inspector-bridge/dist/preload.js').replace(/\\/g, '/');
 const templateStr = templateRaw.replace('PRELOAD_PLACEHOLDER', preloadUrlResolved);
 
+// [Phase 4] 无害化 HTTP 探针，绕开脆弱的 IPC
+const http = require('http');
+
 module.exports = Editor.Panel.extend({
     style: `
         :host { display: flex; flex-direction: column; width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; }
@@ -23,7 +26,6 @@ module.exports = Editor.Panel.extend({
     },
 
     ready() {
-        Editor.info('[mcp-inspector-bridge] 启动 Vue 3 并挂载双分栏系统');
 
         // ==== 1. Vue 3 初始化 ====
         const globalState = reactive({
@@ -36,7 +38,12 @@ module.exports = Editor.Panel.extend({
             isGamePaused: false as boolean,
             isNarrow: false as boolean,
             webviewSrc: '' as string,
-            isPreviewReady: false as boolean
+            isPreviewReady: false as boolean,
+            isSceneReady: false as boolean,
+            profiler: {
+                tick: { fps: 0, drawCall: 0, logicTime: 0, renderTime: 0 }
+            },
+            isInspectorHovered: false as boolean
         });
 
         const app = createApp({
@@ -48,6 +55,7 @@ module.exports = Editor.Panel.extend({
                 // 分辨率控制
                 const selectedResolution = ref('FIT');
                 const isShowFPS = ref(false);
+                const isAudioMuted = ref(false);
                 const isLandscape = ref(false);
                 const wrapperSize = ref({ width: 0, height: 0 });
 
@@ -79,24 +87,65 @@ module.exports = Editor.Panel.extend({
                         isDragging.value = false;
                         document.removeEventListener('mousemove', onMouseMove);
                         document.removeEventListener('mouseup', onMouseUp);
+                        try {
+                            if (typeof Editor !== 'undefined' && Editor.Ipc) {
+                                Editor.Ipc.sendToMain('mcp-inspector-bridge:save-panel-width', rightPanelWidth.value);
+                            }
+                        } catch (e) { }
                     };
                     document.addEventListener('mousemove', onMouseMove);
                     document.addEventListener('mouseup', onMouseUp);
                 };
 
-                // 处理节点树选中事件
-                const onNodeSelect = (node: any) => {
+                const syncNodeDetail = (oldObj: any, newObj: any) => {
+                    if (!oldObj || oldObj.id !== newObj.id) return newObj;
+                    // 更新顶层基础属性
+                    for (let key in newObj) {
+                        if (key !== 'components') oldObj[key] = newObj[key];
+                    }
+                    // 更新组件结构
+                    if (oldObj.components && newObj.components && oldObj.components.length === newObj.components.length) {
+                        for (let i = 0; i < newObj.components.length; i++) {
+                            const oComp = oldObj.components[i];
+                            const nComp = newObj.components[i];
+                            oComp.enabled = nComp.enabled;
+                            oComp.name = nComp.name;
+                            if (oComp.properties && nComp.properties) {
+                                const pMap: Record<string, any> = {};
+                                oComp.properties.forEach((p: any) => pMap[p.key] = p);
+                                nComp.properties.forEach((np: any) => {
+                                    if (pMap[np.key]) {
+                                        pMap[np.key].value = np.value;
+                                    } else {
+                                        oComp.properties.push(np); // fallback
+                                    }
+                                });
+                            }
+                        }
+                    } else {
+                        oldObj.components = newObj.components;
+                    }
+                    return oldObj;
+                };
+
+                // 处理节点树选中事件 (支持主/被动刷新重载)
+                const onNodeSelect = (node: any, isAutoRefresh: boolean = false) => {
                     const wv: any = gameView.value;
                     if (wv) {
                         const code = `window.__mcpCrawler ? JSON.stringify(window.__mcpCrawler.getNodeDetail('${node.id}')) : null`;
                         wv.executeJavaScript(code).then((res: string) => {
                             if (res) {
-                                globalState.nodeDetail = JSON.parse(res);
+                                const newObj = JSON.parse(res);
+                                if (isAutoRefresh && globalState.nodeDetail && globalState.nodeDetail.id === newObj.id) {
+                                    syncNodeDetail(globalState.nodeDetail, newObj);
+                                } else {
+                                    globalState.nodeDetail = newObj;
+                                }
                             } else {
-                                globalState.nodeDetail = null;
+                                if (!isAutoRefresh) globalState.nodeDetail = null;
                             }
                         }).catch(() => {
-                            globalState.nodeDetail = null;
+                            if (!isAutoRefresh) globalState.nodeDetail = null;
                         });
                     }
                 };
@@ -115,20 +164,12 @@ module.exports = Editor.Panel.extend({
                                 window.__mcpCrawler.updateNodeProperty('${uuid}', ${compStr}, '${propKey}', ${valStr});
                             }
                         `;
-                        wv.executeJavaScript(code);
+                        const __p1 = wv.executeJavaScript(code);
+                        if (__p1 && __p1.catch) __p1.catch(() => {});
 
-                        // 真实场景数据持久化同步 (Scene Persistence)
                         try {
-                            const postToConsole = (msg: string, isError: boolean = false) => {
-                                if (wv) {
-                                    const c = isError ? `console.error(${JSON.stringify(msg)});` : `console.log('%c[Bridge Info]', 'color: #00ff00', ${JSON.stringify(msg)});`;
-                                    wv.executeJavaScript(c);
-                                }
-                            };
-
                             Editor.Ipc.sendToPanel('scene', 'scene:query-node', uuid, (err: any, dumpObj: any) => {
                                 if (err) {
-                                    postToConsole('[dump] query-node error: ' + String(err), true);
                                     return;
                                 }
                                 try {
@@ -137,14 +178,11 @@ module.exports = Editor.Panel.extend({
                                     const fs = require('fs');
                                     const p = require('path').join(__dirname, '../../memory/dump.json');
                                     fs.writeFileSync(p, JSON.stringify(comps, null, 2));
-                                    postToConsole('[dump] Successfully wrote to memory/dump.json');
                                 } catch (e: any) {
-                                    postToConsole('[dump] write fail: ' + e.message, true);
                                 }
                             });
 
                             if (compName) {
-                                postToConsole(`[Webview Update] ${compName}.${propKey} = ${value} (Index: ${compIndex})`);
                                 if (wv) {
                                     wv.executeJavaScript(`
                                         (function(){
@@ -159,14 +197,9 @@ module.exports = Editor.Panel.extend({
                                             }
                                             return 'Node or Component Not Found';
                                         })();
-                                    `).then((res: any) => {
-                                        postToConsole(`[Webview Result] Component updated: ${res}`);
-                                    }).catch((err: any) => {
-                                        postToConsole(`[Webview Error] ${err.message}`, true);
-                                    });
+                                    `).catch((err: any) => {});
                                 }
                             } else {
-                                postToConsole(`[Webview Update] Node.${propKey} = ${value}`);
                                 if (wv) {
                                     wv.executeJavaScript(`
                                         (function(){
@@ -182,11 +215,7 @@ module.exports = Editor.Panel.extend({
                                             }
                                             return 'Node Not Found';
                                         })();
-                                    `).then((res: any) => {
-                                        postToConsole(`[Webview Result] Node updated: ${res}`);
-                                    }).catch((err: any) => {
-                                        postToConsole(`[Webview Error] ${err.message}`, true);
-                                    });
+                                    `).catch((err: any) => {});
                                 }
                             }
                         } catch (e) {
@@ -196,41 +225,45 @@ module.exports = Editor.Panel.extend({
                     }
                 };
 
-                const onToggleCrawlerDebug = (enabled: boolean) => {
-                    const wv: any = gameView.value;
-                    if (wv) {
-                        wv.executeJavaScript(`if(window.__mcpCrawler) window.__mcpCrawler.toggleDebugConsole(${enabled});`);
-                    }
-                };
 
                 // DevTools 幂等标志（在 onMounted 内的 dom-ready 回调中使用）
                 let isDevToolsSetup = false;
 
-                // 自动嗅探重连
+                // 独立端口轮询嗅探，检测预览服务器是否已启动
                 let autoConnectTimer: any = null;
                 const tryAutoConnect = () => {
+                    if (!globalState.isSceneReady) return;
                     if (globalState.isPreviewReady) {
                         if (autoConnectTimer) clearInterval(autoConnectTimer);
                         return;
                     }
-                    try {
-                        // 利用 query-hierarchy 安全嗅探：若场景面板活跃，该 IPC 调用会正确回调，否则报错或超时，不会引发引擎底层崩溃。
-                        Editor.Ipc.sendToPanel('scene', 'scene:query-hierarchy', (err: any, res: any) => {
-                            if (!err && res) {
-                                refreshGame();
-                            }
-                        }, 500);
-                    } catch (e) { }
+                    // 静默叩门 7456 端口
+                    const req = http.get('http://localhost:7456', (res: any) => {
+                        // 只要有任何 HTTP 规范内的返回（无论是 200, 404 还是 500）
+                        // 都说明本机的 Express/Cocos 预览服务器已经真正绑在 7456 端口并活着！
+                        if (!globalState.isPreviewReady) {
+                            refreshGame();
+                        }
+                    }).on('error', () => {
+                        // 端口没开（预览服务器还没启动），静默吞异常，继续等下次 2000ms 的轮询
+                    });
+
+                    req.setTimeout(500, () => {
+                        req.destroy();
+                    });
                 };
 
                 onMounted(() => {
+                    (window as any).__mcpOnSceneReady = () => {
+                        globalState.isSceneReady = true;
+                        tryAutoConnect();
+                    };
+
                     tryAutoConnect();
                     autoConnectTimer = setInterval(tryAutoConnect, 2000);
-                    window.addEventListener('focus', tryAutoConnect);
 
-                    // 组件挂载时首先向主进程请求最新的树数据
+                    // 启动拉取持久化的偏好设置
                     try {
-                        Editor.Ipc.sendToMain('mcp-inspector-bridge:query-node-tree');
                         Editor.Ipc.sendToMain('mcp-inspector-bridge:query-resolution', (err: any, res: string) => {
                             if (!err && res) {
                                 selectedResolution.value = res;
@@ -241,16 +274,35 @@ module.exports = Editor.Panel.extend({
                                 isShowFPS.value = res;
                             }
                         });
+                        Editor.Ipc.sendToMain('mcp-inspector-bridge:query-audio-mute', (err: any, res: boolean) => {
+                            if (!err && res !== undefined) {
+                                isAudioMuted.value = res;
+                                // 拉取后立即尝试强行施加静音拦截（补救真空期）
+                                const wv: any = gameView.value;
+                                if (wv && typeof wv.setAudioMuted === 'function') {
+                                    try { wv.setAudioMuted(res); } catch (e) { }
+                                }
+                            }
+                        });
+                        Editor.Ipc.sendToMain('mcp-inspector-bridge:query-panel-width', (err: any, res: number) => {
+                            if (!err && res !== undefined) {
+                                const maxW = document.body.clientWidth - 300;
+                                rightPanelWidth.value = Math.max(200, Math.min(res, maxW > 200 ? maxW : 200));
+                            }
+                        });
                     } catch (e) { }
 
                     const wrap = wrapMount.value;
                     if (wrap) {
                         try {
                             new ResizeObserver(entries => {
-                                if (entries[0].contentRect.width <= 0 || entries[0].contentRect.height <= 0) return;
-                                wrapperSize.value.width = entries[0].contentRect.width;
-                                wrapperSize.value.height = entries[0].contentRect.height;
-                                globalState.isNarrow = entries[0].contentRect.width < 500;
+                                window.requestAnimationFrame(() => {
+                                    if (!entries.length) return;
+                                    if (entries[0].contentRect.width <= 0 || entries[0].contentRect.height <= 0) return;
+                                    wrapperSize.value.width = entries[0].contentRect.width;
+                                    wrapperSize.value.height = entries[0].contentRect.height;
+                                    globalState.isNarrow = entries[0].contentRect.width < 500;
+                                });
                             }).observe(wrap);
                         } catch (e) {
                             // Electron 版本过低兜底
@@ -273,11 +325,9 @@ module.exports = Editor.Panel.extend({
                         // 不再强制剥除套壳页面，因为直接改变 webview.src 会导致 underlying WebContents 重生、引爆 dom-ready 的状态错误，并引发黑屏。
                         // 这里仅保留事件监听。
 
-                        // 监听来自 gameView 的消息，特别是 ping 测试
+                        // 监听来自 gameView 的消息
                         gameViewDynamic.addEventListener('ipc-message', (event: any) => {
-                            if (event.channel === 'ping-pong') {
-                                gameViewDynamic.send('ping-pong-reply', 'Pong from Electron Tab Panel');
-                            } else if (event.channel === 'handshake') {
+                            if (event.channel === 'handshake') {
                                 globalState.cocosInfo = event.args[0];
                                 setTimeout(() => {
                                     executeMacro(isShowFPS.value ? 'fps:true' : 'fps:false');
@@ -292,6 +342,11 @@ module.exports = Editor.Panel.extend({
                                         globalState.nodeTree = parsed;
                                     }
                                     globalState.lastTreeUpdate = Date.now();
+
+                                    // 自动刷新当前选中节点的属性数据 (如果存在有效节点 && 且鼠标未在修改参数)
+                                    if (!globalState.isInspectorHovered && globalState.nodeDetail && globalState.nodeDetail.id) {
+                                        onNodeSelect({ id: globalState.nodeDetail.id }, true);
+                                    }
                                 } catch (e) { }
                             }
                         });
@@ -313,19 +368,26 @@ module.exports = Editor.Panel.extend({
                                     try {
                                         const code = `
                                             (function(){
-                                                function serializeNode(node) {
+                                                function serializeNode(node, currentPrefabDepth) {
                                                     if (!node) return null;
                                                     var isActive = true;
                                                     var isActiveInHierarchy = true;
+                                                    var isScene = false;
                                                     if (typeof eng !== 'undefined' && eng.Scene && node instanceof eng.Scene) {
                                                         isActive = true;
                                                         isActiveInHierarchy = true;
+                                                        isScene = true;
                                                     } else {
                                                         try {
                                                             isActive = node.active !== false;
                                                             isActiveInHierarchy = node.activeInHierarchy !== false;
                                                         } catch (e) {}
                                                     }
+                                                    
+                                                    var isPrefab = !!node._prefab;
+                                                    var prefabRoot = isPrefab && node._prefab.root === node;
+                                                    var nextPrefabDepth = currentPrefabDepth || 0;
+                                                    if (prefabRoot) nextPrefabDepth++;
                                                     var componentNames = [];
                                                     if (node._components) {
                                                         for (var k = 0; k < node._components.length; k++) {
@@ -342,18 +404,23 @@ module.exports = Editor.Panel.extend({
                                                         }
                                                     }
                                                     var data = {
-                                                        id: node.uuid,
+                                                        id: node.uuid || node.id,
                                                         name: node.name,
                                                         active: isActive,
                                                         activeInHierarchy: isActiveInHierarchy,
-                                                        childrenCount: node.childrenCount,
+                                                        childrenCount: node.childrenCount || 0,
                                                         components: node._components ? node._components.length : 0,
                                                         componentNames: componentNames,
-                                                        children: []
+                                                        children: [],
+                                                        isScene: isScene,
+                                                        isPrefab: isPrefab,
+                                                        prefabRoot: prefabRoot,
+                                                        prefabDepth: nextPrefabDepth
                                                     };
                                                     if (node.children) {
                                                         for (var i = 0; i < node.children.length; i++) {
-                                                            data.children.push(serializeNode(node.children[i]));
+                                                            var childData = serializeNode(node.children[i], nextPrefabDepth);
+                                                            if (childData) data.children.push(childData);
                                                         }
                                                     }
                                                     return data;
@@ -367,7 +434,7 @@ module.exports = Editor.Panel.extend({
                                                     var scene = eng.director.getScene();
                                                     if (scene) {
                                                         var isP = (eng.game && typeof eng.game.isPaused === 'function') ? eng.game.isPaused() : false;
-                                                        var result = { tree: serializeNode(scene), version: eng.ENGINE_VERSION, isPaused: isP };
+                                                        var result = { tree: serializeNode(scene, 0), version: eng.ENGINE_VERSION, isPaused: isP };
                                                         return JSON.stringify(result);
                                                     }
                                                 }
@@ -401,26 +468,31 @@ module.exports = Editor.Panel.extend({
                         // dom-ready 后 5 秒超时启动降级轮询（如果探针的正常数据流还没建立的话）
                         gameViewDynamic.addEventListener('dom-ready', () => {
 
-                            // [Fix] 强行注入 CSS 屏蔽 Webview 内部的滚动条 (加强版：涵盖 Cocos 内核的 .contentWrap 和隐藏原生 scrollbar)
+                            // [BugFix] 强制补录音频控制状态以防场景重置导致白噪声泄露
+                            if (isAudioMuted.value && typeof gameViewDynamic.setAudioMuted === 'function') {
+                                try { gameViewDynamic.setAudioMuted(isAudioMuted.value); } catch (e) { }
+                            }
+
+                            // 强行注入 CSS 屏蔽 Webview 内部的滚动条以及外壳元素的溢出
                             try {
-                                gameViewDynamic.insertCSS('html, body, .contentWrap, .content, .wrapper, #GameDiv, #GameCanvas { overflow: hidden !important; margin: 0 !important; padding: 0 !important; } ::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; background: transparent !important; }');
+                                const __pIns = gameViewDynamic.insertCSS('html, body, .contentWrap, .content, .wrapper, #GameDiv, #GameCanvas { overflow: hidden !important; margin: 0 !important; padding: 0 !important; } ::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; background: transparent !important; }');
+                                if (__pIns && __pIns.catch) __pIns.catch(() => {});
                             } catch (e) {
                                 Editor.warn('[Bridge] Webview 注入屏蔽滚动条 CSS 失败', e);
                             }
 
                             setTimeout(() => {
-                                if (!globalState.cocosInfo) {
+                                // [BugFix] 不要因为 src='' 的 about:blank 页面初始化就误触发降级，仅在实际加载场景时检测
+                                if (!globalState.cocosInfo && globalState.isPreviewReady) {
                                     Editor.warn('[Bridge] 5 秒超时：探针握手仍未收到，启动降级轮询');
                                     startFallbackPolling();
                                 } else {
                                 }
                             }, 5000);
 
-                            // ==== DevTools 绑定从这里移除，改为由 setInterval 抢占式完成（避免 dom-ready 时已经 navigate） ====
                         });
                     } // 此处闭合 if (gameViewDynamic)
 
-                    // ==== 【Phase 5.5 拦截方案】彻底移除 onMounted 中无脑轮询，依靠首次点击开发者工具 Tab 的瞬间来拦截 ====
                 });
 
                 // Phase 7: 使用 BrowserView（与原版 CocosInspector 完全对齐）
@@ -611,7 +683,8 @@ module.exports = Editor.Panel.extend({
                                     }
                                 }
                             `;
-                            wv.executeJavaScript(code);
+                            const __p4 = wv.executeJavaScript(code);
+                            if (__p4 && __p4.catch) __p4.catch(() => {});
                         } catch (e) { }
                     } else {
                         Editor.warn('[Bridge] 找不到 game-view，宏发送失败');
@@ -621,6 +694,13 @@ module.exports = Editor.Panel.extend({
                 const togglePause = () => { globalState.isGamePaused = !globalState.isGamePaused; executeMacro('pause'); };
                 const stepGame = () => { globalState.isGamePaused = true; executeMacro('step'); };
                 const toggleFPS = () => { isShowFPS.value = !isShowFPS.value; };
+                const toggleMute = () => {
+                    isAudioMuted.value = !isAudioMuted.value;
+                    const wv: any = gameView.value;
+                    if (wv && typeof wv.setAudioMuted === 'function') {
+                        try { wv.setAudioMuted(isAudioMuted.value); } catch (e) { }
+                    }
+                };
 
                 // 回退方案：在独立窗口中打开 DevTools
                 const openDevToolsExternal = () => {
@@ -651,10 +731,44 @@ module.exports = Editor.Panel.extend({
                     } catch (e) { }
                 });
 
+                watch(isAudioMuted, (newVal: boolean) => {
+                    try {
+                        Editor.Ipc.sendToMain('mcp-inspector-bridge:save-audio-mute', newVal);
+                    } catch (e) { }
+                });
+
+                // Phase 1: 简易数据抽取心跳
+                let profilerTickTimer: any = null;
+                watch(activeTab, (newVal: number) => {
+                    const wv: any = gameView.value;
+                    if (newVal === 4 && wv) {
+                        if (!profilerTickTimer) {
+                            profilerTickTimer = setInterval(() => {
+                                // [Fix Phase 2] 使用 probe.js (runtime-crawler) 注入的定制探针
+                                const expr = `window.__mcpProfilerTick ? JSON.stringify(window.__mcpProfilerTick()) : null`;
+
+                                wv.executeJavaScript(expr).then((res: string) => {
+                                    if (res) {
+                                        try {
+                                            const data = JSON.parse(res);
+                                            Object.assign(globalState.profiler.tick, data);
+                                        } catch (e) { }
+                                    }
+                                }).catch(() => { });
+                            }, 150);
+                        }
+                    } else {
+                        if (profilerTickTimer) {
+                            clearInterval(profilerTickTimer);
+                            profilerTickTimer = null;
+                        }
+                    }
+                });
+
                 return {
                     onNodeSelect,
                     onUpdateNodeProp,
-                    onToggleCrawlerDebug,
+
                     activeTab,
                     selectedResolution,
                     isShowFPS,
@@ -668,6 +782,8 @@ module.exports = Editor.Panel.extend({
                     togglePause,
                     stepGame,
                     toggleFPS,
+                    toggleMute,
+                    isAudioMuted,
                     globalState,
                     gameView,
                     devtoolsView,
@@ -683,5 +799,25 @@ module.exports = Editor.Panel.extend({
     },
 
     messages: {
+        'scene:ready'() {
+            if ((window as any).__mcpOnSceneReady) {
+                (window as any).__mcpOnSceneReady();
+            }
+        }
+    },
+
+    show() {
+        // 当面板获取焦点切回前台时，主动查探目前场景状态
+        if ((window as any).__mcpOnSceneReady) {
+            try {
+                Editor.Ipc.sendToPanel('scene', 'scene:query-hierarchy', null, (err: any, res: any) => {
+                    if (!err && res) {
+                        (window as any).__mcpOnSceneReady();
+                    }
+                });
+            } catch (e) {
+                // 静默拦截可能的上下文丢失
+            }
+        }
     }
 });

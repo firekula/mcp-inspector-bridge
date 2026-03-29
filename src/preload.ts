@@ -9,8 +9,6 @@ const { ipcRenderer } = require('electron');
  * 因此 preload 必须在顶层直接挂载通信桥 + 注入探针。
  */
 window.addEventListener('DOMContentLoaded', () => {
-    console.log('[Webview Preload] DOMContentLoaded 触发，开始初始化通信桥...');
-
     // ===== 1. 隐藏 Cocos 预览页多余的工具栏 =====
     const style = document.createElement('style');
     style.type = 'text/css';
@@ -32,17 +30,8 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // ===== 3. 顶层联通性测试 =====
-    ipcRenderer.sendToHost('ping-pong', 'Ping from Preload.js (Top Frame — 探针即将注入)');
-
-    // ===== 4. 接收从面板返回的消息 =====
-    ipcRenderer.on('ping-pong-reply', (_event: any, message: string) => {
-        console.log('[Webview Preload] 收到 Panel 返回消息:', message);
-    });
-
     // ===== 5. 接收面板的跨层宏通信 =====
     ipcRenderer.on('macro-command', (_event: any, cmd: string) => {
-        console.log('[Webview Preload] 收到宏指令:', cmd);
         // @ts-ignore
         if (typeof window.cc === 'undefined' || !window.cc.game) {
             console.warn('[Webview Preload] 引擎 cc 尚未就绪，忽略指令', cmd);
@@ -78,23 +67,21 @@ window.addEventListener('DOMContentLoaded', () => {
             ipcRenderer.sendToHost('handshake', info);
         }
     };
-    console.log('[Webview Preload] __mcpInspector 通信接口已挂载到 window');
 
-    // ===== 7. 在顶层直接注入运行树爬虫 runtime-crawler.js =====
+    // ===== 7. 在顶层直接注入运行树爬虫 probe.js =====
     try {
         const fs = require('fs');
         const path = require('path');
-        const crawlerContent = fs.readFileSync(path.join(__dirname, 'inject/runtime-crawler.js'), 'utf-8');
+        const crawlerContent = fs.readFileSync(path.join(__dirname, 'probe.js'), 'utf-8');
         const crawlerScript = document.createElement('script');
         crawlerScript.textContent = crawlerContent;
         if (document.head) {
             document.head.appendChild(crawlerScript);
-            console.log('[Webview Preload] runtime-crawler.js 已成功注入到顶层 document.head');
         } else {
-            console.error('[Webview Preload] document.head 不存在，无法注入 runtime-crawler.js');
+            console.error('[Webview Preload] document.head 不存在，无法注入 probe.js');
         }
     } catch (err) {
-        console.error('[Webview Preload] 无法注入 runtime-crawler.js:', err);
+        console.error('[Webview Preload] 无法注入 probe.js:', err);
     }
 
     // ===== 8. 子 iframe 兼容嗅探 (旧版 Cocos 预览页) =====
@@ -104,7 +91,6 @@ window.addEventListener('DOMContentLoaded', () => {
         try {
             const gameDiv = document.getElementById('GameDiv') as HTMLIFrameElement | null;
             if (gameDiv && gameDiv.tagName === 'IFRAME' && gameDiv.contentWindow) {
-                console.log('[Webview Preload] 检测到 GameDiv iframe，尝试向子框架注入探针...');
 
                 // 在子 iframe 中挂载跳板版通信接口（通过 postMessage 回传到顶层）
                 const subframeBootstrap = `
@@ -126,15 +112,12 @@ window.addEventListener('DOMContentLoaded', () => {
                 // 注入树节点爬虫
                 const fs2 = require('fs');
                 const path2 = require('path');
-                const crawlerContent2 = fs2.readFileSync(path2.join(__dirname, 'inject/runtime-crawler.js'), 'utf-8');
+                const crawlerContent2 = fs2.readFileSync(path2.join(__dirname, 'probe.js'), 'utf-8');
                 const crawlerScript2 = gameDiv.contentWindow.document.createElement('script');
                 crawlerScript2.textContent = crawlerContent2;
                 gameDiv.contentWindow.document.head.appendChild(crawlerScript2);
-
-                console.log('[Webview Preload] 子框架 runtime-crawler 注入完成');
             }
         } catch (err) {
-            console.warn('[Webview Preload] 子 iframe 嗅探/注入跳过 (非致命):', err);
         }
     }, 1000); // 延迟 1 秒等待子 iframe 加载
 });

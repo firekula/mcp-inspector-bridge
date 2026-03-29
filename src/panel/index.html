@@ -68,7 +68,8 @@ mark { background: #0078d4; color: white; padding: 0 2px; border-radius: 2px;}
                 <button class="icon-btn" title="刷新页面" @click="refreshGame">↻ <span class="btn-text">刷新</span></button>
                 <button class="icon-btn" title="暂停/恢复引擎" @click="togglePause">{{ globalState.isGamePaused ? '▶️' : '⏸' }} <span class="btn-text">{{ globalState.isGamePaused ? '播放' : '暂停' }}</span></button>
                 <button class="icon-btn" title="单帧运行" @click="stepGame">⏭ <span class="btn-text">单帧</span></button>
-                <button class="icon-btn" title="开关FPS面板" @click="toggleFPS">📉 <span class="btn-text">FPS</span></button>
+                <button class="icon-btn" title="开关引擎性能状态框" @click="toggleFPS">{{ isShowFPS ? '📊' : '📉' }} <span class="btn-text">状态</span></button>
+                <button class="icon-btn" title="开关游戏声音" @click="toggleMute">{{ isAudioMuted ? '🔇' : '🔊' }} <span class="btn-text">音效</span></button>
                 <!-- <button class="icon-btn" title="场景节点选择" @click="toggleSelector">🎯 <span class="btn-text">选取器</span></button> -->
             </div>
             <!-- 分辨率限制控件 -->
@@ -129,6 +130,7 @@ mark { background: #0078d4; color: white; padding: 0 2px; border-radius: 2px;}
             <div :class="['tab-item', activeTab === 1 ? 'active' : '']" @click="activeTab = 1" title="开发者工具">🛠 <span class="tab-text">开发者工具</span></div>
             <div :class="['tab-item', activeTab === 2 ? 'active' : '']" @click="activeTab = 2" title="Cocos信息">ℹ️ <span class="tab-text">Cocos信息</span></div>
             <div :class="['tab-item', activeTab === 3 ? 'active' : '']" @click="activeTab = 3" title="扩展">🔌 <span class="tab-text">扩展</span></div>
+            <div :class="['tab-item', activeTab === 4 ? 'active' : '']" @click="activeTab = 4" title="性能分析">💡 <span class="tab-text">性能分析</span></div>
         </div>
 
         <!-- 内容渲染层 -->
@@ -144,7 +146,7 @@ mark { background: #0078d4; color: white; padding: 0 2px; border-radius: 2px;}
                     <node-tree v-else :tree-data="globalState.nodeTree" @select="onNodeSelect"></node-tree>
                 </div>
                 <div style="flex: 6; overflow-y: hidden; background: #202020; border-top: 1px solid #111;">
-                    <node-inspector :node-detail="globalState.nodeDetail" @update-prop="onUpdateNodeProp" @toggle-debug="onToggleCrawlerDebug"></node-inspector>
+                    <node-inspector :node-detail="globalState.nodeDetail" @update-prop="onUpdateNodeProp" @hover-change="globalState.isInspectorHovered = $event"></node-inspector>
                 </div>
             </div>
 
@@ -179,6 +181,15 @@ mark { background: #0078d4; color: white; padding: 0 2px; border-radius: 2px;}
             </div>
             <div v-show="activeTab === 3" style="position: absolute; inset: 0; padding: 15px;">
                 <h4>第三方扩展</h4>
+            </div>
+
+            <!-- Tab 4: 性能分析 (Phase 1 Barebones) -->
+            <div v-show="activeTab === 4" style="position: absolute; inset: 0; padding: 15px; background: #1a1a1a; display: flex; flex-direction: column; gap: 8px;">
+                <h4 style="margin: 0 0 10px 0; color: #88c;">性能探测数据 (Tick)</h4>
+                <div style="font-family: monospace; font-size: 14px; color: #4CAF50;">FPS: {{ globalState.profiler?.tick?.fps }}</div>
+                <div style="font-family: monospace; font-size: 14px; color: #FF9800;">DrawCall: {{ globalState.profiler?.tick?.drawCall }}</div>
+                <div style="font-family: monospace; font-size: 14px; color: #2196F3;">Render(ms): {{ globalState.profiler?.tick?.renderTime?.toFixed(2) }}</div>
+                <div style="font-family: monospace; font-size: 14px; color: #9C27B0;">Logic(ms): {{ globalState.profiler?.tick?.logicTime?.toFixed(2) }}</div>
             </div>
 
         </div>
