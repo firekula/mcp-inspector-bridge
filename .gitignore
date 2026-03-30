@@ -20,7 +20,7 @@ Thumbs.db
 tools/
 
 # Local Project Specifications
-specs/
+/specs
 *.suo
 *.ntvs*
 *.njsproj

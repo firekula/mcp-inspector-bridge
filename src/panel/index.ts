@@ -45,6 +45,10 @@ module.exports = Editor.Panel.extend({
                 memoryStats: null as any,
                 expandedBundles: {} as any
             },
+            renderDebugger: {
+                snapshots: [] as any[],
+                batchBreaks: [] as any[]
+            },
             isInspectorHovered: false as boolean
         });
 
@@ -375,7 +379,14 @@ module.exports = Editor.Panel.extend({
                         gameViewDynamic.addEventListener('ipc-message', (e: any) => {
                             if (e.channel === 'render-debugger-payload') {
                                 try {
-                                    window.dispatchEvent(new CustomEvent('render-debugger-payload', { detail: e.args[0] }));
+                                    const payload = e.args[0];
+                                    if (payload && payload.type === 'render-debugger:snapshot') {
+                                        globalState.renderDebugger.snapshots.push(payload.data);
+                                        if (globalState.renderDebugger.snapshots.length > 5) {
+                                            globalState.renderDebugger.snapshots.shift();
+                                        }
+                                    }
+                                    window.dispatchEvent(new CustomEvent('render-debugger-payload', { detail: payload }));
                                 } catch (err) {}
                             }
                         });
@@ -386,12 +397,27 @@ module.exports = Editor.Panel.extend({
                                 const jsonStr = e.message.substring('[RenderDebugger]JSON_DATA:'.length);
                                 try {
                                     const payload = JSON.parse(jsonStr);
-                                    if (payload.type === 'render-debugger:batch-break') {
+                                    if (payload && payload.type === 'render-debugger:snapshot') {
+                                        globalState.renderDebugger.snapshots.push(payload.data);
+                                        if (globalState.renderDebugger.snapshots.length > 5) {
+                                            globalState.renderDebugger.snapshots.shift();
+                                        }
+                                    }
+                                    if (payload.type === 'render-debugger:batch-break' || payload.type === 'render-debugger:snapshot') {
                                         window.dispatchEvent(new CustomEvent('render-debugger-payload', { detail: payload }));
                                     }
                                 } catch (err) {}
                             }
                         });
+
+                        // Phase 3: 监听前端面板发来的游戏宏执行请求 (步进回看命令)
+                        window.addEventListener('render-debugger:send-macro', ((e: any) => {
+                            if (e.detail && gameViewDynamic) {
+                                try {
+                                    gameViewDynamic.executeJavaScript(e.detail).catch(() => {});
+                                } catch (err) {}
+                            }
+                        }) as EventListener);
 
                         // ==== 主动降级容错机制 (Fallback Polling) ====
                         // 基于 dom-ready 超时触发，不再依赖 cocosInfo（它可能因探针注入失败而永远为 null）

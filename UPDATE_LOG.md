@@ -10,8 +10,15 @@
   - **彻底静默的 IPC 通信桥墩**：完全抛弃原始简单粗暴的 `console.warn` 警告流刷屏。探针脚本现已打通 Webview 的 `nodeIntegration` 特权，使用纯原生的 `ipcRenderer.sendToHost` 秘密投递分析诊断数据，让原生控制台恢复100%清净整洁。
   - **万级去重与频次计分板 (Deduplication Core)**：专门为断批报错构建了一套带有 Hash 算法（追踪 `肇事者+受害者+打断原因` 三元组）的聚合列表面板。面对哪怕 60FPS 连环绘制断流，也不会使得 UI 无限滚动卡死，而是高频引爆条目右侧的「触发次数 📈」徽章动画，直接暴露游戏最严重的性能溃裂点。
   - **同级跨面板深空跳转 (Cross-Panel Jump Locator)**：不仅能查报错误，表格现在内置了互动按钮 `[📌]`。利用拦截时顺便挖出的节点底层 UUID，点击肇事节点后插件将光速滑跪至 Main 控制台，使用特制的 `expandToNode(uuid)` 广度展开算法将嵌套深渊中的游戏节点一举曝光并高亮挂载至属性检查器中，体验一气呵成。
+- **全景渲染快照与单步溯源面板 (Frame Debugger & Step Replay MVP)**:
+  - **高维指令树映射 (Command Tree View)**：在截帧分析模式下，左侧列表破维展开。完美解析引擎单帧从顶层 `DrawCall` 到每一个打包装填的 `RenderCommand` 层级。配合内联小图标展现对应的 `(Sprite, Label, Graphics)` 等不同组件身份及节点关联。
+  - **管线状态参数表盘 (Pipeline Detail Dashboard)**：右侧提供深度的 `BlendSrc/BlendDst`、`IndicesCount`、材质哈希监控面板。无论是整个 DrawCall 的宏观物理类型（`PT_TRIANGLES`）还是单独某一条绘制指令的排版代价皆能一览无遗。
+  - **离屏防抖单步回放技术 (Debounced Offscreen Render)**：中央黑板实现了震撼的物理渲染复盘功能。随着用户在左侧列表的点击游走，底层探针会接管 `device.draw` 的绘制上限阈值（`_replayLimit`），并于主循环结束前高速执行回读切片。前端借由 100ms 信号阀拦截防抖处理，化巨量请求洪流于无形，为您流畅再现出游戏界面从第一片瓦砾堆叠至完整状态的演进动画。
 
 ### 🐛 缺陷修复
+- **修复快照数据在 Vue 层响应解析引爆的死锁卡挂 (Undefined Length Crash)**:
+  - **核心痛点**：为了完美构筑分层指令树，后端探针全面重构了底层的帧截取模型，将原先简单粗暴的平铺 `commands` 阵列拆分散装到了各个实际的物理 `drawCalls[i]` 内部。然而这直接导致左下角处于实况监听大屏的 UI 遭遇 `TypeError: Cannot read property 'length' of undefined` 原生越界错误而瘫痪了整个重绘组件流程。
+  - **修复方案**：将监听横幅展示的数据来源由直读修正为使用复合防崩溃安全的高级 `reduce` / 三元混合计算管道扫描，重新计算总计的下挂资源命令并安然过界。
 - **修复插件以“单独窗口”模式启动时的长久死锁假死 (Standalone Window Auto-Connect Deadlock)**:
   - **核心痛点**：当用户将插件抽出为独立面板或延后启动时，面板因跨窗口 IPC 路由限制无法接收主编辑器的 `scene:ready` 广播同步，导致画面永久卡死在“等待场景初始化”遮罩层。
   - **重构方案**：全面弃用、移除了 `tryAutoConnect` 内对脆弱编辑器 IPC 状态钩子（`isSceneReady`）的强制约束阻断。实现了完全信赖目标预览服务器地址 `localhost:7456` 的轻量化后台网络心跳轮询，将其作为判定引擎就绪的唯一绝对标准。极大地增加了架构系统的抗干扰性，即便使用单独弹窗开局也能实现秒级无感热启动。

@@ -471,6 +471,33 @@
                 _lastPushedNodeName: "Unknown Node",
                 _lastQuadInfo: null,
 
+                // --- Frame Snapshot Data ---
+                _frames: [],
+                _maxFrames: 5,
+                _currentFrame: null,
+                _isCaptureEnabled: true,
+                _originMainLoop: null,
+                _originBatcherFlush: null,
+                _originDeviceDraw: null,
+                _lastSnapshotSendTime: 0,
+                
+                // --- 画面重绘回放 ---
+                _replayLimit: -1,
+                _currentReplayDrawCallCount: 0,
+                _requestCaptureThisFrame: false,
+                _pendingCommands: [], // 收集发往下一个 DrawCall 的 Command 详情
+
+                stepToDrawCall: function(limitIndex: number, frameSnapshotData: any) {
+                    this._replayLimit = limitIndex;
+                    this._requestCaptureThisFrame = true;
+                    // 尝试促使引擎渲染
+                    const eng = window.cc || window.editorEngine;
+                    if (eng && eng.director && eng.director.isPaused()) {
+                        // 强制触发一次绘制以便我们能捕获
+                        eng.director.mainLoop(eng.director._deltaTime);
+                    }
+                },
+
                 injectHooks: function() {
                     const self = this;
                     if (self._isActive) return;
@@ -545,26 +572,166 @@
                                                 };
                                                 
                                                 // [真正静默模式]：寻找宿主 IPC 专线投递避免污染 Console
-                                                let isSent = false;
-                                                if (typeof require !== 'undefined') {
-                                                    try {
-                                                        const ipc = require('electron').ipcRenderer;
-                                                        if (ipc && ipc.sendToHost) {
-                                                            ipc.sendToHost('render-debugger-payload', payload);
-                                                            isSent = true;
-                                                        }
-                                                    } catch (err) {}
-                                                }
-                                                if (!isSent) {
+                                                if (window.__mcpInspector && window.__mcpInspector.sendRenderDebuggerPayload) {
+                                                    window.__mcpInspector.sendRenderDebuggerPayload(payload);
+                                                } else {
                                                     console.debug(`[RenderDebugger]JSON_DATA:${JSON.stringify(payload)}`);
                                                 }
                                             }
                                     }
                                 }
                             } catch (e) {}
+
+                            // [Phase 4] 收集参与当前正在合批的渲染指令参数
+                            if (self._isCaptureEnabled && self._currentFrame) {
+                                let mat = this._materials && this._materials.length > 0 ? this._materials[0] : null;
+                                let matHash = mat ? mat.getHash() : 'N/A';
+                                let bSrc = mat ? mat.getProperty('blendSrc') : undefined;
+                                let bDst = mat ? mat.getProperty('blendDst') : undefined;
+
+                                self._pendingCommands.push({
+                                    id: self._pendingCommands.length,
+                                    type: this.__classname__ || this.constructor.name || 'Component',
+                                    name: this.node ? this.node.name : 'Unknown',
+                                    nodeUuid: this.node ? (this.node.uuid || this.node.id) : '',
+                                    materialHash: matHash,
+                                    blendSrc: bSrc,
+                                    blendDst: bDst
+                                });
+                            }
                         }
                         return self._originCheckBatch.call(this, batcher, cullingMask);
                     };
+
+                    // --- 1. mainLoop 钩子 (帧起始/结束) ---
+                    if (!self._originMainLoop && eng.Director && eng.Director.prototype.mainLoop) {
+                        self._originMainLoop = eng.Director.prototype.mainLoop;
+                        eng.Director.prototype.mainLoop = function(dt: number) {
+                            self._currentReplayDrawCallCount = 0; // 起始重置计数
+
+                            if (self._isActive && self._isCaptureEnabled) {
+                                self._currentFrame = {
+                                    frameId: eng.director.getTotalFrames(),
+                                    timestamp: performance.now(),
+                                    drawCalls: [],
+                                    totalQuads: 0,
+                                    totalVertices: 0,
+                                    totalDrawCalls: 0
+                                };
+                                self._pendingCommands = [];
+                            }
+                            
+                            self._originMainLoop.call(this, dt);
+                            
+                            // 回读截屏 (在原本渲染循环刚完毕尚未交换走 Buffer 时提取)
+                            if (self._requestCaptureThisFrame) {
+                                self._requestCaptureThisFrame = false;
+                                try {
+                                    const canvas = document.getElementById('GameCanvas') as HTMLCanvasElement;
+                                    if (canvas) {
+                                        const base64 = canvas.toDataURL('image/jpeg', 0.8);
+                                        const payload = {
+                                            type: 'render-debugger:replay-result',
+                                            data: base64
+                                        };
+                                        if (window.__mcpInspector && window.__mcpInspector.sendRenderDebuggerPayload) {
+                                            window.__mcpInspector.sendRenderDebuggerPayload(payload);
+                                        }
+                                    }
+                                } catch (err) {
+                                    console.error("[RenderDebugger] 画布回读失败: ", err);
+                                }
+                            }
+
+                            if (self._isActive && self._isCaptureEnabled && self._currentFrame) {
+                                self._frames.push(self._currentFrame);
+                                if (self._frames.length > self._maxFrames) {
+                                    self._frames.shift();
+                                }
+
+                                // 节流发送快照 (500ms 一次)
+                                const now = performance.now();
+                                if (!self._lastSnapshotSendTime || now - self._lastSnapshotSendTime > 500) {
+                                    self._lastSnapshotSendTime = now;
+                                    const payload = {
+                                        type: 'render-debugger:snapshot',
+                                        data: self._currentFrame
+                                    };
+                                    if (window.__mcpInspector && window.__mcpInspector.sendRenderDebuggerPayload) {
+                                        window.__mcpInspector.sendRenderDebuggerPayload(payload);
+                                    } else {
+                                        // 兼容降级模式，由宿主主动拦截 console
+                                        console.debug(`[RenderDebugger]JSON_DATA:${JSON.stringify(payload)}`);
+                                    }
+                                }
+
+                                self._currentFrame = null;
+                            }
+                        };
+                    }
+
+                    // 废弃对 pushRenderCommand 的旧版本粗粒度拦截（因为我们现在要在 draw 阶段与 checkBacth 中精确挂载 commands）
+                    /*
+                    if (!self._originPushRenderCommand && eng.renderer) {
+                        self._originPushRenderCommand = eng.renderer.pushRenderCommand;
+                        eng.renderer.pushRenderCommand = function(cmd: any) {
+                            if (self._originPushRenderCommand) {
+                                return self._originPushRenderCommand.call(this, cmd);
+                            }
+                        };
+                    }
+                    */
+
+                    // --- 3. flush 和 draw 钩子 (最终 DrawCall) ---
+                    if (eng.renderer && eng.renderer._batcher) {
+                        if (!self._originBatcherFlush) {
+                            self._originBatcherFlush = eng.renderer._batcher.flush;
+                            eng.renderer._batcher.flush = function() {
+                                if (self._isActive && self._isCaptureEnabled && self._currentFrame) {
+                                    // flush前可以插入拦截逻辑
+                                }
+                                if (self._originBatcherFlush) {
+                                    return self._originBatcherFlush.call(this);
+                                }
+                            };
+                        }
+                    }
+                    
+                    if (eng.gfx && eng.gfx.Device) {
+                        if (!self._originDeviceDraw) {
+                            self._originDeviceDraw = eng.gfx.Device.prototype.draw;
+                            eng.gfx.Device.prototype.draw = function(primitiveType: number, indicesStart: number, indicesCount: number) {
+                                
+                                // 限制回放阶段的超量渲染
+                                if (self._replayLimit !== -1) {
+                                    if (self._currentReplayDrawCallCount > self._replayLimit) {
+                                        self._currentReplayDrawCallCount++;
+                                        return; // 跨阶物理抛弃渲染指令
+                                    }
+                                }
+
+                                if (self._isActive && self._isCaptureEnabled && self._currentFrame) {
+                                    self._currentFrame.drawCalls.push({
+                                        id: self._currentFrame.drawCalls.length,
+                                        type: 'draw',
+                                        primitiveType: primitiveType,
+                                        indiceCount: indicesCount,
+                                        vertexCount: Math.floor(indicesCount / 1.5), // 粗略估算四边形的顶点数
+                                        timestamp: performance.now(),
+                                        commands: self._pendingCommands
+                                    });
+                                    self._pendingCommands = []; // 消费完毕
+                                    self._currentFrame.totalDrawCalls++;
+                                }
+
+                                self._currentReplayDrawCallCount++;
+
+                                if (self._originDeviceDraw) {
+                                    return self._originDeviceDraw.call(this, primitiveType, indicesStart, indicesCount);
+                                }
+                            };
+                        }
+                    }
 
                     self._isActive = true;
                     console.log("[RenderDebugger] MVP 探针已成功注入游戏内渲染管线 ✅");
@@ -590,9 +757,30 @@
                         const methodName = typeof eng.RenderComponent.prototype._checkBacth === 'function' ? '_checkBacth' : '_checkBatch';
                         eng.RenderComponent.prototype[methodName] = self._originCheckBatch;
                     }
+                    if (self._originMainLoop && eng.Director) {
+                        eng.Director.prototype.mainLoop = self._originMainLoop;
+                        self._originMainLoop = null;
+                    }
+                    if (self._originPushRenderCommand && eng.renderer) {
+                        eng.renderer.pushRenderCommand = self._originPushRenderCommand;
+                        self._originPushRenderCommand = null;
+                    }
+                    if (self._originBatcherFlush && eng.renderer && eng.renderer._batcher) {
+                        eng.renderer._batcher.flush = self._originBatcherFlush;
+                        self._originBatcherFlush = null;
+                    }
+                    if (self._originDeviceDraw && eng.gfx && eng.gfx.Device) {
+                        eng.gfx.Device.prototype.draw = self._originDeviceDraw;
+                        self._originDeviceDraw = null;
+                    }
                     
                     self._lastQuadInfo = null;
+                    self._frames = [];
+                    self._currentFrame = null;
                     self._isActive = false;
+                    self._replayLimit = -1;
+                    self._currentReplayDrawCallCount = 0;
+                    self._pendingCommands = [];
                     console.log("[RenderDebugger] MVP 探针已安全撤出，游戏内归还原生管线 🛑");
                 }
             };

@@ -65,6 +65,9 @@ window.addEventListener('DOMContentLoaded', () => {
         },
         sendHandshake: (info: any) => {
             ipcRenderer.sendToHost('handshake', info);
+        },
+        sendRenderDebuggerPayload: (payload: any) => {
+            ipcRenderer.sendToHost('render-debugger-payload', payload);
         }
     };
 
@@ -99,7 +102,8 @@ window.addEventListener('DOMContentLoaded', () => {
                         window.__mcpInspector = {
                             updateTree: function(data) { window.parent.postMessage({ __mcp_ipc_proxy: true, channel: 'update-tree', args: [data] }, '*'); },
                             sendLog: function(data) { window.parent.postMessage({ __mcp_ipc_proxy: true, channel: 'send-log', args: [data] }, '*'); },
-                            sendHandshake: function(info) { window.parent.postMessage({ __mcp_ipc_proxy: true, channel: 'handshake', args: [info] }, '*'); }
+                            sendHandshake: function(info) { window.parent.postMessage({ __mcp_ipc_proxy: true, channel: 'handshake', args: [info] }, '*'); },
+                            sendRenderDebuggerPayload: function(payload) { window.parent.postMessage({ __mcp_ipc_proxy: true, channel: 'render-debugger-payload', args: [payload] }, '*'); }
                         };
                     })();
                 `;
