@@ -217,7 +217,10 @@ mark { background: #0078d4; color: white; padding: 0 2px; border-radius: 2px;}
                                 </thead>
                                 <tbody>
                                     <tr v-for="(res, idx) in globalState.profiler?.memoryStats?.allResources?.slice(0, 100) || []" :key="res.id || idx" style="border-bottom: 1px solid #2a2a2a;">
-                                        <td style="padding: 4px 6px; word-break: break-all; max-width: 150px;" class="truncate-text" :title="res.name">{{ res.name }}</td>
+                                        <td style="padding: 4px 6px; word-break: break-all; max-width: 150px; display: flex; align-items: center; justify-content: space-between;" :title="res.name">
+                                            <span class="truncate-text" style="flex: 1;">{{ res.name }}</span>
+                                            <span @click.stop="locateResource(res)" style="cursor: pointer; font-size: 12px; flex-shrink: 0; padding-left: 4px; opacity: 0.8; transition: opacity 0.2s;" title="在资源管理器中定位" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">🎯</span>
+                                        </td>
                                         <td style="padding: 4px 6px; color: #88c;">{{ res.type }}</td>
                                         <td style="padding: 4px 6px; color: #e57373;">{{ formatBytes(res.memory) }}</td>
                                         <td style="padding: 4px 6px; color: #aaa;">{{ res.refCount }}</td>
@@ -255,7 +258,10 @@ mark { background: #0078d4; color: white; padding: 0 2px; border-radius: 2px;}
                                 <div v-if="globalState.profiler.expandedBundles[bundle.name]" style="padding-left: 15px; margin-top: 2px;">
                                     <table style="width: 100%; border-collapse: collapse; font-size: 10px; text-align: left;">
                                         <tr v-for="(bres, bri) in bundle.resources.slice(0, 50)" :key="bres.id || bri" style="border-bottom: 1px dashed #333;">
-                                            <td style="padding: 3px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" :title="bres.name">└ {{ bres.name }}</td>
+                                            <td style="padding: 3px; max-width: 120px; display: flex; align-items: center; justify-content: space-between;" :title="bres.name">
+                                                <span class="truncate-text" style="flex: 1;">└ {{ bres.name }}</span>
+                                                <span @click.stop="locateResource(bres)" style="cursor: pointer; font-size: 11px; flex-shrink: 0; padding-left: 4px; opacity: 0.8; transition: opacity 0.2s;" title="在资源管理器中定位" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">🎯</span>
+                                            </td>
                                             <td style="padding: 3px; color: #777;">{{ bres.type }}</td>
                                             <td style="padding: 3px; color: #e57373;">{{ formatBytes(bres.memory) }}</td>
                                         </tr>

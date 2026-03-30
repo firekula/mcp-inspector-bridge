@@ -954,6 +954,27 @@ module.exports = Editor.Panel.extend({
                 };
 
                 const nodeTreeRef = ref(null);
+
+                let locateResourceTimer: any = null;
+                const locateResource = (res: any) => {
+                    if (!res || !res.id) return;
+                    const uuid: string = res.id;
+                    // 过滤内部或不合法资源 UUID
+                    if (uuid.length < 5) return;
+                    if (uuid.startsWith('default-') || uuid.indexOf('preview-') !== -1) {
+                        console.log(`[Bridge] 已过滤针对内置资源的定位请求: ${uuid}`);
+                        return;
+                    }
+
+                    if (locateResourceTimer) clearTimeout(locateResourceTimer);
+                    locateResourceTimer = setTimeout(() => {
+                        if (typeof Editor !== 'undefined' && Editor.Ipc) {
+                            Editor.Ipc.sendToAll('assets:hint', uuid);
+                            console.log(`[Bridge] 已请求定位资源: ${uuid} (${res.name})`);
+                        }
+                    }, 300);
+                };
+
                 const onRenderDebuggerLocate = (id: string) => {
                     activeTab.value = 0;
                     nextTick(() => {
@@ -1070,6 +1091,7 @@ module.exports = Editor.Panel.extend({
                     onUpdateNodeProp,
                     onRenderDebuggerToggle,
                     onRenderDebuggerLocate,
+                    locateResource,
                     nodeTreeRef,
 
                     activeTab,
