@@ -39,7 +39,6 @@ module.exports = Editor.Panel.extend({
             isGamePaused: false as boolean,
             isNarrow: false as boolean,
             webviewSrc: '' as string,
-            isPreviewReady: false as boolean,
             profiler: {
                 tick: { fps: 0, drawCall: 0, logicTime: 0, renderTime: 0 },
                 memoryStats: null as any,
@@ -49,7 +48,8 @@ module.exports = Editor.Panel.extend({
                 snapshots: [] as any[],
                 batchBreaks: [] as any[]
             },
-            isInspectorHovered: false as boolean
+            isInspectorHovered: false as boolean,
+            isEditorSceneActive: true as boolean
         });
 
         const app = createApp({
@@ -174,6 +174,10 @@ module.exports = Editor.Panel.extend({
                         if (__p1 && __p1.catch) __p1.catch(() => {});
 
                         try {
+                            if (!globalState.isEditorSceneActive) {
+                                console.warn('[Bridge] 场景未激活，拦截了向 Editor 的底层 IPC 调用以防报错');
+                                return;
+                            }
                             Editor.Ipc.sendToPanel('scene', 'scene:query-node', uuid, (err: any, dumpObj: any) => {
                                 if (err) {
                                     return;
@@ -235,32 +239,38 @@ module.exports = Editor.Panel.extend({
                 // DevTools 幂等标志（在 onMounted 内的 dom-ready 回调中使用）
                 let isDevToolsSetup = false;
 
-                // 独立端口轮询嗅探，检测预览服务器是否已启动
-                let autoConnectTimer: any = null;
-                const tryAutoConnect = () => {
-                    if (globalState.isPreviewReady) {
-                        if (autoConnectTimer) clearInterval(autoConnectTimer);
-                        return;
-                    }
-                    // 静默叩门 7456 端口
-                    const req = http.get('http://localhost:7456', (res: any) => {
-                        // 只要有任何 HTTP 规范内的返回（无论是 200, 404 还是 500）
-                        // 都说明本机的 Express/Cocos 预览服务器已经真正绑在 7456 端口并活着！
-                        if (!globalState.isPreviewReady) {
-                            refreshGame();
-                        }
-                    }).on('error', () => {
-                        // 端口没开（预览服务器还没启动），静默吞异常，继续等下次 2000ms 的轮询
-                    });
-
-                    req.setTimeout(500, () => {
-                        req.destroy();
-                    });
-                };
-
                 onMounted(() => {
-                    tryAutoConnect();
-                    autoConnectTimer = setInterval(tryAutoConnect, 2000);
+                    window.addEventListener('scene-status-changed', (e: any) => {
+                        const wasActive = globalState.isEditorSceneActive;
+                        globalState.isEditorSceneActive = e.detail && e.detail.active !== false;
+                        
+                        // 状态发生切换
+                        if (wasActive !== globalState.isEditorSceneActive) {
+                            if (!globalState.isEditorSceneActive) {
+                                // 失去焦点：强行切断 webview 的祸源
+                                globalState.webviewSrc = 'about:blank';
+                            } else {
+                                // 场景重回激活，立即触发重置和渲染
+                                globalState.lastTreeUpdate = 0;
+                                refreshGame(); // 直接自动刷新，无需 ping
+                            }
+                        }
+                    });
+
+                    // 面板启动时主动查询一次当前场景激活态
+                    try {
+                        if (typeof Editor !== 'undefined' && Editor.Ipc) {
+                            Editor.Ipc.sendToMain('mcp-inspector-bridge:query-scene-active', (err: any, isActive: boolean) => {
+                                if (!err && isActive !== undefined) {
+                                    globalState.isEditorSceneActive = isActive;
+                                }
+                            });
+                        }
+                    } catch (e) {}
+
+                    if (globalState.isEditorSceneActive) {
+                        refreshGame();
+                    }
 
                     // 启动拉取持久化的偏好设置
                     try {
@@ -551,7 +561,8 @@ module.exports = Editor.Panel.extend({
 
                             setTimeout(() => {
                                 // [BugFix] 不要因为 src='' 的 about:blank 页面初始化就误触发降级，仅在实际加载场景时检测
-                                if (!globalState.cocosInfo && globalState.isPreviewReady) {
+                                // [Robust] 支持多开编辑器时临时递增的本地端（如 7457, 7458）
+                                if (!globalState.cocosInfo && globalState.webviewSrc && globalState.webviewSrc.includes('localhost:')) {
                                     Editor.warn('[Bridge] 5 秒超时：探针握手仍未收到，启动降级轮询');
                                     startFallbackPolling();
                                 } else {
@@ -718,12 +729,17 @@ module.exports = Editor.Panel.extend({
 
                 const rotateScreen = () => { isLandscape.value = !isLandscape.value; };
                 function refreshGame() {
+                    if (!globalState.isEditorSceneActive) {
+                        console.warn('[Bridge] 场景未激活，刷新操作被安全拦截');
+                        return;
+                    }
                     globalState.isGamePaused = false;
                     const wv: any = gameView.value;
-                    if (!globalState.isPreviewReady) {
-                        globalState.isPreviewReady = true;
+                    
+                    // [Robust] 只有地址不再包含 localhost 时 (例如空字符串或 about:blank)，才重新赋予初始的预览服务器地址
+                    if (!globalState.webviewSrc || !globalState.webviewSrc.includes('localhost:')) {
                         globalState.webviewSrc = 'http://localhost:7456';
-                    } else if (wv) {
+                    } else if (wv && typeof wv.reload === 'function') {
                         try { wv.reload(); } catch (e) { }
                     }
                 }
@@ -1151,6 +1167,9 @@ module.exports = Editor.Panel.extend({
     },
 
     messages: {
+        'scene-status-changed'(event: any, payload: any) {
+            window.dispatchEvent(new CustomEvent('scene-status-changed', { detail: payload }));
+        }
     },
 
     show() {

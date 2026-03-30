@@ -36,6 +36,10 @@
 - **修复切换“多标签面板”时开发者悬浮窗残留与失忆问题 (DevTools Residual & Context Loss)**:
   - **针对内嵌模式 (Docked)**：由于 Cocos 在同级面板来回点击切页（Tab）时并不会调用底层的 `hide` 生命钩子导致悬窗漂移残留，我们强力引入了渲染级物理 `ResizeObserver`。其通过捕获视口宽高的瞬间萎缩坍塌准确探知后台隐藏行为，无缝拔出 `BrowserView` 解决该残留痼疾。
   - **针对独立弹窗 (Standalone)**：摒弃了前身应对重影残留而粗暴调用的 `closeDevTools()` 物理灭绝手段。新引入 Electron 底层反射提取宿主 `BrowserWindow` 句柄，辅以非销毁式的 `win.hide()` / `win.show()` 指令达成真正意义上的隐匿潜伏。使开发者切走再切回时，控制台原有的全部 HTTP 报错记录、审查元素深层展开焦点等一切上下文状态悉数保持完好，达成“绝不强删的免刷新纯净开发体验”。
+- **彻底根治场景未激活引发的底层 `stashScene` 崩溃与断连 (Inactive Scene Nuclear Crash Recovery)**:
+  - **核心痛点**：当 Cocos 编辑器未打开任何可用场景时，底层 Webview 主动查询或发送到 `localhost:7456` 的哪怕一次微弱嗅探请求，都会致使内置预览服务器尝试强行序列化空场景而抛出 `Cannot read property 'name' of null`，直接致使编辑器后台报错乃至重载死锁。
+  - **重构防线1：拦截器绝对禁区**：完全清除了不稳定的 HTTP `tryAutoConnect` 嗅探机制及冗余的 `isPreviewReady` 标志。直接利用编辑器 IPC 确立 `isEditorSceneActive` 为单一真相来源。一旦场景失联，不仅弹出物理遮罩防护，更瞬间将后台存活的 `<webview>` 源清空剥离至 `about:blank` 丢弃执行权，杜绝任何访问。
+  - **重构防线2：安全自愈与多开兼容**：依赖精准捕捉的 `scene-status-changed` 翻转事件。无论插件被挂起多久，只要玩家切回有效工作区，底层便全自动脱离锁定区并重设渲染路径。配合全新升级针对多实例（编辑器多开临时递增端口如 7457 7458...）而设计的 `.includes('localhost:')` 防覆盖包容校验，实现全天候无接缝秒级热补载复活。
 
 ## [0.0.4] - 2026-03-29
 

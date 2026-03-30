@@ -8,10 +8,11 @@
 - **🚀 双分栏工作流 (Dual-Pane Layout)**
   采用现代化的 Vue 3 构建插件主面板。左侧保留原生 Webview 渲染游戏视口，右侧原生集成 Chrome DevTools，实现“边玩边审”的沉浸式体验。
   
-- **🛡️ 稳态 BrowserView 底层架构与启动防崩壁垒**
+- **🛡️ 稳态 BrowserView 底层架构与极净防崩壁垒 (Anti-Crash Barrier)**
   彻底规避了 `webContents.setDevToolsWebContents()` 在 `<webview>` 标签上的 `about:blank` 导航死锁问题。通过逆向深入还原，采用 Electron 原生 `BrowserView` 作为 DevTools 容器，确立了绝对稳固的 CDP (Chrome DevTools Protocol) 链路。
-  巧妙利用底层 IPC 搭建了智能的“场景嗅探拦截机制”。在判断到 Cocos 内部场景尚未就绪时主动挂起请求，不仅通过视觉遮罩引导用户操作，更辅以面板焦点防抖监听实现无感知的瞬间自动化复苏连接，彻底根除长期困扰的 Preview Server 空跑级内部崩坏报错。
-  - **全形态窗口适配与保活 (Standalone & Docked)**：无论是内嵌在编辑器面板中，还是作为“独立窗口”悬浮，插件皆能利用底层 HTTP 穿透探测完美完成无头轮询自启动。针对单独弹出的开发者工具窗口，创新性采取了原生 `BrowserWindow` 手动句柄捕获与物理隐藏 (`hide()/show()`) 方案，实现在工作面板标签切换时的秒级切后台与“隐身”，避免了再次打开 DevTools 时所有网络瀑布流记录与深层节点失去记录（丢失焦点）的世纪灾难代码体验。
+  - **全隔离的场景存活校验网**：痛下决心移除了旧版激进但致命的底层 HTTP `tryAutoConnect` 端口扫描，彻底绝杀当编辑器为空场景状态时，因受到网络级嗅探干扰迫使引擎去触发 `stashScene` 而导致的 `TypeError` 满盘皆输报错。建立以编辑器特权级别 IPC `isEditorSceneActive` 为不可越界的信托底盘：当失去工作背景，页面会全自动将 Webview 拦截放逐至纯黑死寂层（`about:blank`）；只要检测到场景归位，插件即刻实现完全自发、100% 自动对载流 `refreshGame` 复位。
+  - **多实例多开端口防御 (Multi-Instance Tolerant)**：考虑到游戏多项目并行研发的环境，全面增强优化了对于预览端 `localhost:` 的自适应 URL 包容规则。不再执拗硬编码 `7456`，使得不论底层编辑器递增漂移到 `7457` 或 `7458` 等衍生端口时，5秒失联熔断降级等保护机制依旧稳如磐石。
+  - **全形态窗口适配与保活 (Standalone & Docked)**：无论是内嵌在编辑器面板中，还是作为“独立窗口”悬浮，插件皆能秒级重连唤醒。针对单独弹出的开发者工具窗口，创新性采取了原生 `BrowserWindow` 手动句柄捕获与物理隐藏 (`hide()/show()`) 方案，实现在工作面板标签切换时的秒级切后台与“隐身”，维持全部断点、抓包等前置上下文，提供永不断档即切即用的绝杀调试体验。
 
 - **⚡ 智能运行时探针与节点树架构 (Runtime Probe & Node Tree)**
   基于预加载脚本 (`preload.js`) 动态无侵入地向游戏运行时注入核心探针。不仅能瞬时截获游戏 DOM 树，更深度适配了 Cocos Creator 2.4 引擎底层的属性陷阱（完美跨越 `cc.Scene` 对 `active` 的 getter 报错劫持）。

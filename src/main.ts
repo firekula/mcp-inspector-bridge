@@ -1,11 +1,15 @@
 'use strict';
 declare const Editor: any;
 
+let _isSceneActive = false;
+
 /**
  * mcp-inspector-bridge: 主进程入口
  */
 module.exports = {
     load() {
+        // [Backend] 启动时假定场景还未完全就绪，等待 scene:ready
+        _isSceneActive = false;
     },
 
     unload() {
@@ -13,9 +17,28 @@ module.exports = {
 
     // 注册跨进程 IPC 消息侦听器
     messages: {
+        'scene:ready'() {
+            _isSceneActive = true;
+            Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'scene-status-changed', { active: true });
+        },
+        'scene:reloading'() {
+            _isSceneActive = false;
+            Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'scene-status-changed', { active: false });
+        },
+        'scene:closed'() {
+            _isSceneActive = false;
+            Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'scene-status-changed', { active: false });
+        },
         'open'() {
             // 收到菜单指令，打开主面板
             Editor.Panel.open('mcp-inspector-bridge');
+        },
+        'query-scene-active'(event: any) {
+            if (event.reply) {
+                // 也可通过向 scene 面板发信检查双保险
+                const active = _isSceneActive !== false;
+                event.reply(null, active);
+            }
         },
         'query-node-tree'(event: any) {
             // 目前已经通过 probe/crawler 脚本使用了 setInterval 自动轮询并通过
