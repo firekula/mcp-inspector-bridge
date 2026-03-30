@@ -39,7 +39,7 @@ export const NodeTree = {
                           @click.stop="toggleExpand(node)">▶</span>
                           
                     <span class="node-icon" v-if="getIcon(node)">{{ getIcon(node) }}</span>
-                    <span class="node-name" v-html="highlight(node.name)"></span>
+                    <span class="node-name" v-html="highlight(node.name, node.isMatch)"></span>
                     
                     <span v-if="node.matchedComponent" style="margin-left: auto; font-size: 11px; color: #888; display: inline-block;">
                         ({{ node.matchedComponent }})
@@ -62,20 +62,22 @@ export const NodeTree = {
         const visibleNodes = computed(() => {
             const list: any[] = [];
             const queries = searchQuery.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+            const isSearching = queries.length > 0;
             
-            function traverse(node: any, depth: number, isVisible: boolean, currentPath: string[]) {
-                if (!node || !node.id) return;
+            // 第一遍：深搜打上匹配标记缓存
+            const matchState = new Map<string, { isMatch: boolean, hasMatchedDescendant: boolean, matchedComponent: string }>();
+            
+            function markMatches(node: any): { isMatch: boolean, hasMatchedDescendant: boolean, matchedComponent: string } {
+                if (!node || !node.id) return { isMatch: false, hasMatchedDescendant: false, matchedComponent: '' };
                 
-                const hasChildren = node.children && node.children.length > 0;
-                
-                // 搜索时展示全部匹配项，忽略折叠状态
-                let matches = true;
+                let isMatch = true;
                 let matchedComponent = '';
-                if (queries.length > 0) {
+                
+                if (isSearching) {
                     const nodeNameLower = (node.name || '').toLowerCase();
                     const cList = node.componentNames || (Array.isArray(node.components) ? node.components : []);
                     const cNamesLower = cList.map((c: string) => c.toLowerCase());
-                    matches = queries.every((q: string) => {
+                    isMatch = queries.every((q: string) => {
                         if (nodeNameLower.includes(q)) return true;
                         const matchIdx = cNamesLower.findIndex((c: string) => c.includes(q));
                         if (matchIdx !== -1) {
@@ -84,44 +86,107 @@ export const NodeTree = {
                         }
                         return false;
                     });
+                } else {
+                    isMatch = false;
                 }
-
-                // 初始化折叠状态：默认前1级展开
-                if (expandedState.value[node.id] === undefined) {
-                    expandedState.value[node.id] = depth < 1;
-                }
-
-                // 只有当父节点将其标记为可见，或者是全局搜索命中时，才进入列表
-                if (isVisible && (queries.length === 0 || matches)) {
-                    list.push({
-                        ...node,
-                        depth,
-                        expanded: !!expandedState.value[node.id],
-                        hasChildren,
-                        componentsCount: node.components ? node.components.length : 0,
-                        matchedComponent,
-                        ancestorIds: currentPath
-                    });
-                }
-
-                // 递归子节点
-                if (hasChildren) {
-                    // 如果存在搜索查询，强制子树也随之展开以暴露可能匹配的后代
-                    const childrenVisible = isVisible && (expandedState.value[node.id] || queries.length > 0);
-                    const nextPath = [...currentPath, node.id];
+                
+                let hasMatchedDescendant = false;
+                if (node.children && node.children.length > 0) {
                     for (const child of node.children) {
-                        traverse(child, depth + 1, childrenVisible, nextPath);
+                        const childRes = markMatches(child);
+                        if (childRes.isMatch || childRes.hasMatchedDescendant) {
+                            hasMatchedDescendant = true;
+                        }
+                    }
+                }
+                
+                const state = { isMatch, hasMatchedDescendant, matchedComponent };
+                matchState.set(node.id, state);
+                return state;
+            }
+
+            if (isSearching) {
+                if (props.treeData && props.treeData.id) {
+                    markMatches(props.treeData);
+                } else if (props.treeData && props.treeData.children) {
+                    for (const child of props.treeData.children) {
+                        markMatches(child);
                     }
                 }
             }
 
-            // 以场景树根节点为起点进行遍历
+            // 第二遍：入队可见渲染列表
+            function traverse(node: any, depth: number, isVisible: boolean, isRevealedByParent: boolean, currentPath: string[]) {
+                if (!node || !node.id) return;
+                
+                const hasChildren = node.children && node.children.length > 0;
+                
+                if (expandedState.value[node.id] === undefined) {
+                    expandedState.value[node.id] = depth < 1;
+                }
+
+                let matches = false;
+                let matchedComponent = '';
+                let hasMatchedDescendant = false;
+                
+                if (isSearching) {
+                    const state = matchState.get(node.id);
+                    if (state) {
+                        matches = state.isMatch;
+                        matchedComponent = state.matchedComponent;
+                        hasMatchedDescendant = state.hasMatchedDescendant;
+                    }
+                }
+
+                let shouldPush = false;
+                if (!isSearching) {
+                    shouldPush = isVisible;
+                } else {
+                    shouldPush = isVisible && (matches || hasMatchedDescendant); // 严格路径过滤，只塞入匹配链
+                }
+
+                if (shouldPush) {
+                    list.push({
+                        ...node,
+                        depth,
+                        expanded: isSearching && hasMatchedDescendant ? true : !!expandedState.value[node.id],
+                        hasChildren,
+                        componentsCount: node.components ? node.components.length : 0,
+                        matchedComponent,
+                        isMatch: isSearching ? matches : undefined,
+                        ancestorIds: currentPath
+                    });
+                }
+
+                if (hasChildren) {
+                    const nextPath = [...currentPath, node.id];
+                    for (const child of node.children) {
+                        let childVisible = false;
+                        let childRevealedByParent = false;
+                        
+                        if (!isSearching) {
+                            childVisible = isVisible && !!expandedState.value[node.id];
+                        } else {
+                            const childState = matchState.get(child.id);
+                            const childOnTrack = childState ? (childState.isMatch || childState.hasMatchedDescendant) : false;
+                            
+                            if (childOnTrack) {
+                                childVisible = isVisible; // 只有位于匹配树干上的子节点才有资格向下钻递可见性
+                            } else {
+                                childVisible = false; // 严格剔除一切不相关的并列节点以及普通子节点
+                            }
+                        }
+                        
+                        traverse(child, depth + 1, childVisible, false, nextPath);
+                    }
+                }
+            }
+
             if (props.treeData && props.treeData.id) {
-                traverse(props.treeData, 0, true, []);
+                traverse(props.treeData, 0, true, false, []);
             } else if (props.treeData && props.treeData.children) {
-                // 有时候传来的是个包裹数组
                 for (const child of props.treeData.children) {
-                    traverse(child, 0, true, []);
+                    traverse(child, 0, true, false, []);
                 }
             }
             
@@ -199,7 +264,8 @@ export const NodeTree = {
             searchQuery.value = '';
         };
 
-        const highlight = (name: string) => {
+        const highlight = (name: string, isMatch?: boolean) => {
+            if (isMatch === false) return name; // 搜索模式下此节点并不匹配
             const queries = searchQuery.value.trim().split(/\s+/).filter(Boolean);
             if (queries.length === 0) return name;
             
