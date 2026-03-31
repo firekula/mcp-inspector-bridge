@@ -8,7 +8,7 @@ export const NodeTree = {
             default: () => ({ children: [] })
         }
     },
-    emits: ['select'],
+    emits: ['select', 'hover'],
     template: `
         <div class="node-tree-wrap">
             <div class="search-bar" style="position: relative;">
@@ -32,7 +32,9 @@ export const NodeTree = {
                         getPrefabClass(node)
                      ]"
                      :style="{ paddingLeft: (node.depth * 15 + 5) + 'px' }"
-                     @click="selectNode(node)">
+                     @click="selectNode(node)"
+                     @mouseenter="hoverNode(node)"
+                     @mouseleave="clearHover()">
                      
                     <span class="caret" 
                           :class="{ expanded: node.expanded, hidden: !node.hasChildren }"
@@ -209,6 +211,14 @@ export const NodeTree = {
             emit('select', node);
         };
 
+        const hoverNode = (node: any) => {
+            emit('hover', node);
+        };
+
+        const clearHover = () => {
+            emit('hover', null);
+        };
+
         const expandToNode = (targetId: string) => {
             let path: string[] | null = null;
             function findPath(node: any, currentPath: string[]): boolean {
@@ -296,7 +306,9 @@ export const NodeTree = {
             highlight,
             getIcon,
             getPrefabClass,
-            expandToNode
+            expandToNode,
+            hoverNode,
+            clearHover
         };
     }
 };

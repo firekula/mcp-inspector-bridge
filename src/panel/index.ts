@@ -309,6 +309,11 @@ module.exports = Editor.Panel.extend({
                 const onNodeSelect = (node: any, isAutoRefresh: boolean = false) => {
                     const wv: any = gameView.value;
                     if (wv) {
+                        try {
+                            const selCode = `if(window.__mcpCrawler && window.__mcpCrawler.setSelectionTarget){ window.__mcpCrawler.setSelectionTarget('${node.id}'); }`;
+                            wv.executeJavaScript(selCode).catch(() => {});
+                        } catch (e) {}
+
                         const code = `window.__mcpCrawler ? JSON.stringify(window.__mcpCrawler.getNodeDetail('${node.id}')) : null`;
                         wv.executeJavaScript(code).then((res: string) => {
                             if (res) {
@@ -324,6 +329,17 @@ module.exports = Editor.Panel.extend({
                         }).catch(() => {
                             if (!isAutoRefresh) globalState.nodeDetail = null;
                         });
+                    }
+                };
+
+                const onNodeHover = (node: any) => {
+                    const wv: any = gameView.value;
+                    if (wv) {
+                        try {
+                            const hoverId = node ? node.id : '';
+                            const code = `if(window.__mcpCrawler && window.__mcpCrawler.setHoverTarget){ window.__mcpCrawler.setHoverTarget('${hoverId}'); }`;
+                            wv.executeJavaScript(code).catch(() => {});
+                        } catch (e) {}
                     }
                 };
 
@@ -595,6 +611,7 @@ module.exports = Editor.Panel.extend({
                                             (function(){
                                                 function serializeNode(node, currentPrefabDepth) {
                                                     if (!node) return null;
+                                                    if (node.name === '__mcp_hover_overlay__' || node.name === '__mcp_select_overlay__') return null;
                                                     var isActive = true;
                                                     var isActiveInHierarchy = true;
                                                     var isScene = false;
@@ -1307,6 +1324,7 @@ module.exports = Editor.Panel.extend({
                     onLocateAsset,
                     onPrintComp,
                     onNodeSelect,
+                    onNodeHover,
                     onUpdateNodeProp,
                     nodeTreePanelWidth,
                     isNodeTreeDragging,
