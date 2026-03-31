@@ -50,7 +50,7 @@ module.exports = Editor.Panel.extend({
                 batchBreaks: [] as any[]
             },
             isInspectorHovered: false as boolean,
-            isEditorSceneActive: true as boolean
+            isEditorSceneActive: false as boolean
         });
 
         const app = createApp({
@@ -58,6 +58,9 @@ module.exports = Editor.Panel.extend({
             setup() {
                 // 当前活跃的 Tab (0=main, 1=devtools, 2=cocos, 3=ext)
                 const activeTab = ref(0);
+                
+                // 首次场景激活刷新锁定志
+                let hasInitialRefreshed = false;
 
                 // 2 秒警告栏的自动隐藏控制
                 let fallbackWarningTimeout: any = null;
@@ -415,12 +418,14 @@ module.exports = Editor.Panel.extend({
                         // 状态发生切换
                         if (wasActive !== globalState.isEditorSceneActive) {
                             if (!globalState.isEditorSceneActive) {
-                                // 失去焦点：强行切断 webview 的祸源
-                                globalState.webviewSrc = 'about:blank';
+                                // 失去焦点：仅标记状态，不再切断 webview 引起频繁重载和白屏
                             } else {
-                                // 场景重回激活，立即触发重置和渲染
-                                globalState.lastTreeUpdate = 0;
-                                refreshGame(); // 直接自动刷新，无需 ping
+                                // 场景重回激活，仅在首次捕获时触发重置和渲染
+                                if (!hasInitialRefreshed) {
+                                    hasInitialRefreshed = true;
+                                    globalState.lastTreeUpdate = 0;
+                                    refreshGame(); // 直接自动刷新，无需 ping
+                                }
                             }
                         }
                     });
@@ -431,14 +436,24 @@ module.exports = Editor.Panel.extend({
                             Editor.Ipc.sendToMain('mcp-inspector-bridge:query-scene-active', (err: any, isActive: boolean) => {
                                 if (!err && isActive !== undefined) {
                                     globalState.isEditorSceneActive = isActive;
+                                    // 根据后置结果安全决定是否触发初次刷新
+                                    if (isActive && !hasInitialRefreshed) {
+                                        hasInitialRefreshed = true;
+                                        globalState.lastTreeUpdate = 0;
+                                        refreshGame();
+                                    }
                                 }
                             });
+                        } else {
+                            // 纯浏览器无 IPC 环境的兼容
+                            globalState.isEditorSceneActive = true;
+                            if (!hasInitialRefreshed) {
+                                hasInitialRefreshed = true;
+                                globalState.lastTreeUpdate = 0;
+                                refreshGame();
+                            }
                         }
                     } catch (e) { }
-
-                    if (globalState.isEditorSceneActive) {
-                        refreshGame();
-                    }
 
                     // 启动拉取持久化的偏好设置
                     try {

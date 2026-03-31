@@ -32,3 +32,9 @@
   - `src/scene-script.ts` 仅用于少部分必须触达编辑器原生窗口的操作，**不可用于游戏运行时状态的拦截或逻辑回调**。
   - 对于所有的游戏管线拦截、逻辑探针，必须注入到 `src/probe.ts` (爬虫对象) 中，由 `src/preload.ts` 负责将其自动挂载至 Webview 网页的 `<head>`。
 - **通信铁律**: 前端 Vue 面板组件若需向游戏环境发送指令，**严禁使用** `Editor.Ipc` 或 `Editor.Scene.callSceneScript`，必须通过获取 DOM 实例执行脚本：`document.querySelector('webview').executeJavaScript(...)`。
+
+## 第六条：异步时序与状态竞态预防 (Async Timing & Race Conditions)
+**跨进程交互和生命周期中的状态管理必须秉持“防御性编程”姿态。**
+- **拒绝预先武断判决**：对于需要向主进程通过 `Editor.Ipc.sendToMain(...)` 异步远端查询状态（如场景是否激活 `query-scene-active` 等）的情况，**绝对禁止**使用主观预测的初始值 `true / false` 进而去**同步、越权放行**后续敏感逻辑。
+- **强制结果回调驱动**：后续的诸如画面重载（`refreshGame`）、场景分析或数据注入等依赖外部系统状态的行为，必须且只能被延后挂起，直到真正拿到安全的异步 IPC Callback 返回结果或监听事件后才能判定触发。
+- **安全的初始状态起手**：切忌将本地静态变量和未知的远端系统（如 Creator 编辑器底层引擎或 Webview 容器）环境混为一谈，本地控制器的起手状态应当基于最安全的退让原则（如 `false` 或 `null`）而不是激进值起手。防范在宿主尚未初始化完全时对其发起越级操作，从而诱发底层如 `Cannot read property 'name' of null` 等恶性级崩溃。
