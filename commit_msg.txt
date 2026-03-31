@@ -1,6 +1,0 @@
-feat(panel): 增加顶部标签页自定义拖动排序支持与持久化固化
-
-- 【数据驱动】：抛弃了原始纯文本硬编码模式，为 `src/panel/index.html` 的顶栏引入基于 Vue 的响应式列表循环渲染，统一管理标签图标与描述。并彻底开放了原生 HTML5 API `draggable="true"`。
-- 【兼容性对抗】：针对 Cocos Creator 编辑器底座对原生事件的主场屏蔽，加构了 `.stop` Vue 事件冒泡掐断机制并为 CSS 施加挂起态的 Timeout 重合补丁（阻止半透明幽灵图 Bug），彻底盘活了 Chromium 所阉割的体验手感。
-- 【本地自愈存储】：增加专属 `mcp-inspector-tabs-order` Key 进行落盘。当拖拽释放完成即刻留存排序纯指纹阵列（ID List）。每次插件重启时，算法还会对因大版本换代遗留缺少的新属性组件进行主动向后插队拼接处理（Appending Sequence），彻底断绝长久的数据崩溃。
-- 【文档与打包管理】：同步升级 README 手册、UPDATE_LOG (v0.0.6) 以及配套构建系统。

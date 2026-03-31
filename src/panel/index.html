@@ -154,15 +154,21 @@ mark { background: #0078d4; color: white; padding: 0 2px; border-radius: 2px;}
             
             <!-- Tab 0: Node Tree & Props -->
             <div v-show="activeTab === 0" style="position: absolute; inset: 0; display: flex; flex-direction: column;">
-                <div v-if="globalState.isFallbackMode" style="padding: 10px; background: #fff3e0; color: #ef6c00; font-size: 11px; border-bottom: 1px solid #ffe0b2;">
+                <div v-if="globalState.showFallbackWarning" style="padding: 10px; background: #fff3e0; color: #ef6c00; font-size: 11px; border-bottom: 1px solid #ffe0b2;">
                     ⚠️ [降级容错模式] 原生 IPC 数据链路受阻，当前面板正通过主动 DOM 轮询模式拉取。
                 </div>
-                <div style="flex: 4; display: flex; flex-direction: column; overflow-y: hidden; background: #252525; border-bottom: 1px solid #444;">
-                    <div v-if="!globalState.nodeTree" style="color: #666; font-size: 12px; text-align: center; margin-top: 50px;">(等待加载场景节点树)</div>
-                    <node-tree ref="nodeTreeRef" v-else :tree-data="globalState.nodeTree" @select="onNodeSelect"></node-tree>
-                </div>
-                <div style="flex: 6; overflow-y: hidden; background: #202020; border-top: 1px solid #111;">
-                    <node-inspector :node-detail="globalState.nodeDetail" @update-prop="onUpdateNodeProp" @hover-change="globalState.isInspectorHovered = $event" @locate-node="onLocateNode" @locate-asset="onLocateAsset"></node-inspector>
+                <div style="flex: 1; display: flex; flex-direction: row; min-height: 0;">
+                    <div :style="{ width: nodeTreePanelWidth + 'px', flexShrink: 0, display: 'flex', flexDirection: 'column', overflowY: 'hidden', background: '#252525' }">
+                        <div v-if="!globalState.nodeTree" style="color: #666; font-size: 12px; text-align: center; margin-top: 50px;">(等待加载场景节点树)</div>
+                        <node-tree ref="nodeTreeRef" v-else :tree-data="globalState.nodeTree" @select="onNodeSelect"></node-tree>
+                    </div>
+                    
+                    <div class="resizer" @mousedown="startNodeTreeDrag" title="拖拉调整侧栏宽度"></div>
+
+                    <div style="flex: 1; overflow-y: hidden; background: #202020; min-width: 0; position: relative;">
+                        <node-inspector :node-detail="globalState.nodeDetail" @update-prop="onUpdateNodeProp" @hover-change="globalState.isInspectorHovered = $event" @locate-node="onLocateNode" @locate-asset="onLocateAsset"></node-inspector>
+                        <div v-show="isNodeTreeDragging" style="position: absolute; inset: 0; z-index: 99;"></div>
+                    </div>
                 </div>
             </div>
 

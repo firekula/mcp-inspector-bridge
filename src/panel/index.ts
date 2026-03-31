@@ -2,7 +2,7 @@ declare const Editor: any;
 import * as fs from 'fs';
 import * as path from 'path';
 
-const { createApp, ref, computed, onMounted, reactive, watch, nextTick } = require('vue');
+const { createApp, ref, computed, onMounted, onUnmounted, reactive, watch, nextTick } = require('vue');
 const { remote } = require('electron');
 const { NodeTree } = require('./components/NodeTree');
 const { NodeInspector } = require('./components/NodeInspector');
@@ -34,6 +34,7 @@ module.exports = Editor.Panel.extend({
             nodeTree: null as any,
             lastTreeUpdate: 0 as number,
             isFallbackMode: false as boolean,
+            showFallbackWarning: false as boolean,
             devToolsError: null as string | null,
             nodeDetail: null as any,
             isGamePaused: false as boolean,
@@ -57,6 +58,26 @@ module.exports = Editor.Panel.extend({
             setup() {
                 // 当前活跃的 Tab (0=main, 1=devtools, 2=cocos, 3=ext)
                 const activeTab = ref(0);
+
+                // 2 秒警告栏的自动隐藏控制
+                let fallbackWarningTimeout: any = null;
+                watch(() => globalState.isFallbackMode, (newVal: boolean) => {
+                    if (newVal) {
+                        globalState.showFallbackWarning = true;
+                        if (fallbackWarningTimeout) {
+                            clearTimeout(fallbackWarningTimeout);
+                        }
+                        fallbackWarningTimeout = setTimeout(() => {
+                            globalState.showFallbackWarning = false;
+                        }, 2000);
+                    }
+                });
+
+                onUnmounted(() => {
+                    if (fallbackWarningTimeout) {
+                        clearTimeout(fallbackWarningTimeout);
+                    }
+                });
 
                 // 标签页管理模型与持久化
                 const baseTabsTemplate = [
@@ -199,6 +220,51 @@ module.exports = Editor.Panel.extend({
                             if (typeof Editor !== 'undefined' && Editor.Ipc) {
                                 Editor.Ipc.sendToMain('mcp-inspector-bridge:save-panel-width', rightPanelWidth.value);
                             }
+                        } catch (e) { }
+                    };
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                };
+
+                // Node Tree Split Pane Dragger State
+                const nodeTreePanelWidth = ref(250);
+                const isNodeTreeDragging = ref(false);
+
+                try {
+                    const savedW = window.localStorage.getItem('mcp-inspector-nodetree-width');
+                    if (savedW) {
+                        const wNum = parseInt(savedW, 10);
+                        if (!isNaN(wNum) && wNum >= 150) {
+                            nodeTreePanelWidth.value = wNum;
+                        }
+                    }
+                } catch(e) {}
+
+                const startNodeTreeDrag = (downEvent: MouseEvent) => {
+                    isNodeTreeDragging.value = true;
+                    // Prevent text selection during drag
+                    if (downEvent.preventDefault) downEvent.preventDefault();
+                    
+                    const startX = downEvent.clientX;
+                    const startWidth = nodeTreePanelWidth.value;
+
+                    const onMouseMove = (e: MouseEvent) => {
+                        if (!isNodeTreeDragging.value) return;
+                        const deltaX = e.clientX - startX;
+                        const newWidth = startWidth + deltaX;
+
+                        // Clamp: min 150px, max depends on total available space to keep right panel at least 250px
+                        const maxW = rightPanelWidth.value - 250;
+                        if (newWidth > 150 && newWidth < (maxW > 150 ? maxW : 9999)) {
+                            nodeTreePanelWidth.value = newWidth;
+                        }
+                    };
+                    const onMouseUp = () => {
+                        isNodeTreeDragging.value = false;
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                        try {
+                            window.localStorage.setItem('mcp-inspector-nodetree-width', nodeTreePanelWidth.value.toString());
                         } catch (e) { }
                     };
                     document.addEventListener('mousemove', onMouseMove);
@@ -1194,7 +1260,6 @@ module.exports = Editor.Panel.extend({
                 window.addEventListener('panel-close', _onPanelClose);
                 window.addEventListener('panel-visibility-change', _onVisibilityChange);
 
-                const { onUnmounted } = require('vue');
                 if (onUnmounted) {
                     onUnmounted(() => {
                         window.removeEventListener('panel-hide', _onPanelHide);
@@ -1233,6 +1298,9 @@ module.exports = Editor.Panel.extend({
                     onLocateAsset,
                     onNodeSelect,
                     onUpdateNodeProp,
+                    nodeTreePanelWidth,
+                    isNodeTreeDragging,
+                    startNodeTreeDrag,
                     onRenderDebuggerToggle,
                     onRenderDebuggerLocate,
                     locateResource,
