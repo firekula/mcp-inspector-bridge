@@ -201,6 +201,75 @@
                 console.error("[MCP Crawler] Exception in updateNodeProperty: ", e);
             }
             return false;
+        },
+
+        printComponentData: function (uuid, compIndex) {
+            const node = this.findNodeByUuid(uuid);
+            if (!node || !node._components || compIndex < 0 || compIndex >= node._components.length) {
+                console.warn("[MCP Crawler] Target node or component not found for printing.", uuid, compIndex);
+                return;
+            }
+            
+            const comp = node._components[compIndex];
+            const eng = window.cc || {};
+            
+            function getNodePath(n) {
+                if (!n) return '';
+                let isValidStr = (n.isValid === false) ? ' (Destroyed)' : '';
+                let path = n.name + isValidStr;
+                let current = n.parent;
+                while (current) {
+                    let curValidStr = (current.isValid === false) ? ' (Destroyed)' : '';
+                    path = current.name + curValidStr + '/' + path;
+                    current = current.parent;
+                }
+                return path;
+            }
+
+            const seen = new WeakSet();
+            const replacer = function (key, value) {
+                if (value === null || value === undefined) return value;
+                
+                // 处理 cc.Node
+                if (eng.Node && value instanceof eng.Node) {
+                    return `[ cc.Node: ${getNodePath(value)} ]`;
+                }
+                
+                // 处理 cc.Asset
+                if (eng.Asset && value instanceof eng.Asset) {
+                    let clsName = "cc.Asset";
+                    if (value.__classname__) clsName = value.__classname__;
+                    else if (value.constructor && value.constructor.name) clsName = value.constructor.name;
+                    return `[ ${clsName}: ${value.name || value._name || 'Unnamed'} ]`;
+                }
+
+                if (typeof value === 'object') {
+                    if (seen.has(value)) {
+                        return "[Circular]";
+                    }
+                    seen.add(value);
+                }
+                
+                return value;
+            };
+
+            try {
+                const jsonStr = JSON.stringify(comp, replacer, 4);
+                let compName = comp.name || comp.__classname__ || "Unknown";
+                const match = compName.match(/<([^>]+)>/);
+                if (match) compName = match[1];
+
+                console.log(`%c[MCP] 组件 (${compName}) 数据导出成功 👇`, 'color: #00ff00; font-weight: bold;');
+                console.log(jsonStr);
+                console.log(`%c---------------------------------------`, 'color: #00ff00; font-weight: bold;');
+                
+                // 尝试写入剪贴板
+                if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(jsonStr).catch(function(err){});
+                }
+            } catch (err) {
+                console.error("[MCP Crawler] 序列化组件数据失败: ", err);
+            }
         }
     };
 

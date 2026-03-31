@@ -1287,9 +1287,25 @@ module.exports = Editor.Panel.extend({
                     }, 300);
                 };
 
+                const onPrintComp = (uuid: string, compIndex: number) => {
+                    const wv: any = gameView.value;
+                    if (wv) {
+                        const code = `
+                            if (window.__mcpCrawler && typeof window.__mcpCrawler.printComponentData === 'function') {
+                                window.__mcpCrawler.printComponentData('${uuid}', ${compIndex});
+                            } else {
+                                console.error("[MCP Bridge] 致命错误: window.__mcpCrawler.printComponentData 未就绪。");
+                            }
+                        `;
+                        const __p = wv.executeJavaScript(code);
+                        if (__p && __p.catch) __p.catch(() => {});
+                    }
+                };
+
                 return {
                     onLocateNode,
                     onLocateAsset,
+                    onPrintComp,
                     onNodeSelect,
                     onUpdateNodeProp,
                     nodeTreePanelWidth,

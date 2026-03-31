@@ -8,7 +8,7 @@ export const NodeInspector = {
             default: null
         }
     },
-    emits: ['update-prop', 'hover-change', 'locate-node', 'locate-asset'],
+    emits: ['update-prop', 'hover-change', 'locate-node', 'locate-asset', 'print-comp'],
     template: `
         <div class="node-inspector-wrap" style="padding: 10px; overflow-y: auto; height: 100%; color: #d0d0d0;"
              @mouseenter="onHover(true)" @mouseleave="onHover(false)">
@@ -74,6 +74,7 @@ export const NodeInspector = {
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <input type="checkbox" :checked="comp.enabled" @change="onUpdateProp(comp.name, 'enabled', $event.target.checked, comp.realIndex)" />
                             <span @click="toggleComp(index)" style="cursor: pointer; font-weight: bold; font-size: 13px;">{{ comp.name }}</span>
+                            <span @click.stop="onPrintComponent(nodeDetail.id, comp.realIndex)" style="cursor: pointer; font-size: 14px; opacity: 0.5; transition: opacity 0.2s;" title="将当前组件数据打印/导出为JSON" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">🖨️</span>
                         </div>
                         <span @click="toggleComp(index)" style="cursor: pointer; font-size: 10px; color: #888;">{{ expandedComps[index] ? '▼' : '◀' }}</span>
                     </div>
@@ -220,6 +221,10 @@ export const NodeInspector = {
             emit('locate-asset', uuid);
         };
 
+        const onPrintComponent = (uuid: string, compIndex: number) => {
+            emit('print-comp', uuid, compIndex);
+        };
+
         return {
             expandedComps,
             toggleComp,
@@ -227,7 +232,8 @@ export const NodeInspector = {
             onHover,
             formatNumber,
             onLocateNodeRef,
-            onLocateAssetRef
+            onLocateAssetRef,
+            onPrintComponent
         };
     }
 };
