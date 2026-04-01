@@ -68,6 +68,9 @@ window.addEventListener('DOMContentLoaded', () => {
         },
         sendRenderDebuggerPayload: (payload: any) => {
             ipcRenderer.sendToHost('render-debugger-payload', payload);
+        },
+        sendNodeSelected: (uuid: string) => {
+            ipcRenderer.sendToHost('node-picker-selected', uuid);
         }
     };
 
@@ -103,7 +106,8 @@ window.addEventListener('DOMContentLoaded', () => {
                             updateTree: function(data) { window.parent.postMessage({ __mcp_ipc_proxy: true, channel: 'update-tree', args: [data] }, '*'); },
                             sendLog: function(data) { window.parent.postMessage({ __mcp_ipc_proxy: true, channel: 'send-log', args: [data] }, '*'); },
                             sendHandshake: function(info) { window.parent.postMessage({ __mcp_ipc_proxy: true, channel: 'handshake', args: [info] }, '*'); },
-                            sendRenderDebuggerPayload: function(payload) { window.parent.postMessage({ __mcp_ipc_proxy: true, channel: 'render-debugger-payload', args: [payload] }, '*'); }
+                            sendRenderDebuggerPayload: function(payload) { window.parent.postMessage({ __mcp_ipc_proxy: true, channel: 'render-debugger-payload', args: [payload] }, '*'); },
+                            sendNodeSelected: function(uuid) { window.parent.postMessage({ __mcp_ipc_proxy: true, channel: 'node-picker-selected', args: [uuid] }, '*'); }
                         };
                     })();
                 `;

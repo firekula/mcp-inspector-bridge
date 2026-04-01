@@ -25,7 +25,7 @@ export const NodeInspector = {
                         <input type="text" :value="nodeDetail.name" @change="onUpdateProp(null, 'name', $event.target.value)" style="flex: 1; padding: 4px; background: #1e1e1e; color: #fff; border: 1px solid #555; border-radius: 3px; min-width: 0; box-sizing: border-box;" />
                     </div>
                     
-                    <div class="transform-grid" style="display: grid; grid-template-columns: 40px 1fr 1fr; gap: 5px; align-items: center; font-size: 12px;">
+                    <div class="transform-grid" style="display: grid; grid-template-columns: 50px 1fr 1fr; gap: 5px; align-items: center; font-size: 12px;">
                         <!-- Position -->
                         <span style="color: #bbb;">Pos</span>
                         <div class="prop-input-wrap" style="display: flex; align-items: center;">
@@ -55,6 +55,17 @@ export const NodeInspector = {
                             <input type="number" step="0.1" :value="formatNumber(nodeDetail.scaleY)" @change="onUpdateProp(null, 'scaleY', parseFloat($event.target.value))" style="width: 100%; padding: 2px 4px; background: #1e1e1e; color: #fff; border: 1px solid #444; border-radius: 2px; min-width: 0; box-sizing: border-box;" />
                         </div>
 
+                        <!-- Anchor -->
+                        <span style="color: #bbb;">Anchor</span>
+                        <div class="prop-input-wrap" style="display: flex; align-items: center;">
+                            <span style="color: #ff6b6b; margin-right: 4px;">X</span>
+                            <input type="number" step="0.1" :value="formatNumber(nodeDetail.anchorX)" @change="onUpdateProp(null, 'anchorX', parseFloat($event.target.value))" style="width: 100%; padding: 2px 4px; background: #1e1e1e; color: #fff; border: 1px solid #444; border-radius: 2px; min-width: 0; box-sizing: border-box;" />
+                        </div>
+                        <div class="prop-input-wrap" style="display: flex; align-items: center;">
+                            <span style="color: #69b02a; margin-right: 4px;">Y</span>
+                            <input type="number" step="0.1" :value="formatNumber(nodeDetail.anchorY)" @change="onUpdateProp(null, 'anchorY', parseFloat($event.target.value))" style="width: 100%; padding: 2px 4px; background: #1e1e1e; color: #fff; border: 1px solid #444; border-radius: 2px; min-width: 0; box-sizing: border-box;" />
+                        </div>
+
                         <!-- Size -->
                         <span style="color: #bbb;">Size</span>
                         <div class="prop-input-wrap" style="display: flex; align-items: center;">
@@ -64,6 +75,39 @@ export const NodeInspector = {
                         <div class="prop-input-wrap" style="display: flex; align-items: center;">
                             <span style="color: #ccc; margin-right: 4px;">H</span>
                             <input type="number" step="1" :value="formatNumber(nodeDetail.height)" @change="onUpdateProp(null, 'height', parseFloat($event.target.value))" style="width: 100%; padding: 2px 4px; background: #1e1e1e; color: #fff; border: 1px solid #444; border-radius: 2px; min-width: 0; box-sizing: border-box;" />
+                        </div>
+
+                        <!-- Color -->
+                        <span style="color: #bbb;">Color</span>
+                        <div class="prop-input-wrap" style="display: flex; align-items: center; grid-column: span 2;">
+                            <input type="color" :value="nodeDetail.color ? nodeDetail.color.substring(0, 7) : '#ffffff'" @change="onUpdateProp(null, 'color', $event.target.value)" style="width: 24px; height: 24px; padding: 0; border: none; background: transparent; cursor: pointer; margin-right: 6px;" />
+                            <input type="text" :value="nodeDetail.color" @change="onUpdateProp(null, 'color', $event.target.value)" style="flex: 1; padding: 2px 4px; background: #1e1e1e; color: #fff; border: 1px solid #444; border-radius: 2px; min-width: 0; box-sizing: border-box;" />
+                        </div>
+
+                        <!-- Opacity -->
+                        <span style="color: #bbb;">Opacity</span>
+                        <div class="prop-input-wrap" style="display: flex; align-items: center; grid-column: span 2;">
+                            <input type="number" step="1" :value="nodeDetail.opacity" @change="onUpdateProp(null, 'opacity', parseInt($event.target.value) || 0)" min="0" max="255" style="width: 100%; padding: 2px 4px; background: #1e1e1e; color: #ff9800; border: 1px solid #444; border-radius: 2px; min-width: 0; box-sizing: border-box; font-weight: bold;" />
+                        </div>
+
+                        <!-- Skew -->
+                        <span style="color: #bbb;">Skew</span>
+                        <div class="prop-input-wrap" style="display: flex; align-items: center;">
+                            <span style="color: #ff6b6b; margin-right: 4px;">X</span>
+                            <input type="number" step="1" :value="formatNumber(nodeDetail.skewX)" @change="onUpdateProp(null, 'skewX', parseFloat($event.target.value))" style="width: 100%; padding: 2px 4px; background: #1e1e1e; color: #fff; border: 1px solid #444; border-radius: 2px; min-width: 0; box-sizing: border-box;" />
+                        </div>
+                        <div class="prop-input-wrap" style="display: flex; align-items: center;">
+                            <span style="color: #69b02a; margin-right: 4px;">Y</span>
+                            <input type="number" step="1" :value="formatNumber(nodeDetail.skewY)" @change="onUpdateProp(null, 'skewY', parseFloat($event.target.value))" style="width: 100%; padding: 2px 4px; background: #1e1e1e; color: #fff; border: 1px solid #444; border-radius: 2px; min-width: 0; box-sizing: border-box;" />
+                        </div>
+
+                        <!-- Group -->
+                        <span style="color: #bbb;">Group</span>
+                        <div class="prop-input-wrap" style="display: flex; align-items: center; grid-column: span 2;">
+                            <select v-if="nodeDetail.groupList && nodeDetail.groupList.length > 0" :value="nodeDetail.groupIndex" @change="onUpdateProp(null, 'groupIndex', parseInt($event.target.value))" style="width: 100%; padding: 2px 4px; background: #1e1e1e; color: #fff; border: 1px solid #444; border-radius: 2px; box-sizing: border-box;">
+                                <option v-for="(gName, idx) in nodeDetail.groupList" :key="idx" :value="idx">{{ gName }}</option>
+                            </select>
+                            <input v-else type="number" step="1" :value="nodeDetail.groupIndex" @change="onUpdateProp(null, 'groupIndex', parseInt($event.target.value) || 0)" style="width: 100%; padding: 2px 4px; background: #1e1e1e; color: #fff; border: 1px solid #444; border-radius: 2px; min-width: 0; box-sizing: border-box;" />
                         </div>
                     </div>
                 </div>

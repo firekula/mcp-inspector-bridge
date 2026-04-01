@@ -84,7 +84,7 @@ mark { background: #0078d4; color: white; padding: 0 2px; border-radius: 2px;}
                 <button class="icon-btn" title="单帧运行" @click="stepGame">⏭ <span class="btn-text">单帧</span></button>
                 <button class="icon-btn" title="开关引擎性能状态框" @click="toggleFPS">{{ isShowFPS ? '📊' : '📉' }} <span class="btn-text">状态</span></button>
                 <button class="icon-btn" title="开关游戏声音" @click="toggleMute">{{ isAudioMuted ? '🔇' : '🔊' }} <span class="btn-text">音效</span></button>
-                <!-- <button class="icon-btn" title="场景节点选择" @click="toggleSelector">🎯 <span class="btn-text">选取器</span></button> -->
+                <button :class="['icon-btn', globalState.isNodePickerActive ? 'active' : '']" :style="{ color: globalState.isNodePickerActive ? '#09f' : '#ccc', borderColor: globalState.isNodePickerActive ? '#09f' : '#555' }" title="场景节点拾取" @click="toggleNodePicker">🎯 <span class="btn-text">选取器</span></button>
             </div>
             <!-- 分辨率限制控件 -->
             <select v-model="selectedResolution" class="resolution-select truncate-text" style="background:#555; color:#fff; border:1px solid #777; padding:3px; outline:none; border-radius:3px; flex-shrink: 1;">

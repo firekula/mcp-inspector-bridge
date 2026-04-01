@@ -50,7 +50,8 @@ module.exports = Editor.Panel.extend({
                 batchBreaks: [] as any[]
             },
             isInspectorHovered: false as boolean,
-            isEditorSceneActive: false as boolean
+            isEditorSceneActive: false as boolean,
+            isNodePickerActive: false as boolean
         });
 
         const app = createApp({
@@ -561,6 +562,38 @@ module.exports = Editor.Panel.extend({
                                     }
                                     window.dispatchEvent(new CustomEvent('render-debugger-payload', { detail: payload }));
                                 } catch (err) { }
+                            } else if (e.channel === 'node-picker-selected') {
+                                try {
+                                    const uuid = e.args[0];
+                                    globalState.isNodePickerActive = false;
+                                    if (uuid) {
+                                        const refNodeTreeInst: any = app._instance?.refs?.nodeTreeRef;
+                                        if (refNodeTreeInst && typeof refNodeTreeInst.expandToNode === 'function') {
+                                            const success = refNodeTreeInst.expandToNode(uuid);
+                                            // Edge Case 1: 孤儿节点补偿
+                                            if (!success) {
+                                                console.warn('[Bridge] 找不到该节点的缓存树记录，发起 Fallback Tree Refresh...');
+                                                refreshGame();
+                                                setTimeout(() => {
+                                                    const newRefTreeInst: any = app._instance?.refs?.nodeTreeRef;
+                                                    if (newRefTreeInst && typeof newRefTreeInst.expandToNode === 'function') {
+                                                        newRefTreeInst.expandToNode(uuid);
+                                                    }
+                                                }, 800);
+                                            }
+                                        } else {
+                                            // 兼容回退
+                                            onNodeSelect({ id: uuid }, true);
+                                        }
+                                    } else {
+                                        // 点空防御 - 清除焦点
+                                        globalState.nodeDetail = null;
+                                        const refNodeTreeInst: any = app._instance?.refs?.nodeTreeRef;
+                                        if (refNodeTreeInst) {
+                                            refNodeTreeInst.selectedId = '';
+                                        }
+                                    }
+                                } catch(err) { }
                             }
                         });
 
@@ -893,6 +926,17 @@ module.exports = Editor.Panel.extend({
                 });
 
                 const rotateScreen = () => { isLandscape.value = !isLandscape.value; };
+                const toggleNodePicker = () => {
+                    globalState.isNodePickerActive = !globalState.isNodePickerActive;
+                    const wv: any = gameView.value;
+                    if (wv) {
+                        const method = globalState.isNodePickerActive ? 'enable' : 'disable';
+                        const code = `if(window.__mcpNodePicker) window.__mcpNodePicker.${method}();`;
+                        const p = wv.executeJavaScript(code);
+                        if (p && p.catch) p.catch(()=>{});
+                    }
+                };
+                
                 function refreshGame() {
                     if (!globalState.isEditorSceneActive) {
                         console.warn('[Bridge] 场景未激活，刷新操作暂被拦截以防报错。');
@@ -1348,6 +1392,7 @@ module.exports = Editor.Panel.extend({
                     stepGame,
                     toggleFPS,
                     toggleMute,
+                    toggleNodePicker,
                     isAudioMuted,
                     globalState,
                     formatBytes,

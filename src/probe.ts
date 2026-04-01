@@ -46,6 +46,12 @@
                 height: node.height || 0,
                 anchorX: node.anchorX !== undefined ? node.anchorX : 0.5,
                 anchorY: node.anchorY !== undefined ? node.anchorY : 0.5,
+                color: node.color ? '#' + node.color.toHEX() : '#ffffff',
+                opacity: node.opacity !== undefined ? node.opacity : 255,
+                skewX: node.skewX || 0,
+                skewY: node.skewY || 0,
+                groupIndex: node.groupIndex !== undefined ? node.groupIndex : 0,
+                groupList: window.cc && window.cc.game ? window.cc.game.groupList : null,
                 components: [],
             };
             
@@ -171,6 +177,15 @@
                     // Update property on the node directly
                     if (propKey === 'rotation' && 'angle' in node) {
                         node.angle = -value;
+                    } else if (propKey === 'color' && window.cc && window.cc.Color) {
+                        let hex = String(value);
+                        if (hex.startsWith('#')) hex = hex.slice(1);
+                        let r = parseInt(hex.slice(0, 2), 16) || 0;
+                        let g = parseInt(hex.slice(2, 4), 16) || 0;
+                        let b = parseInt(hex.slice(4, 6), 16) || 0;
+                        node.color = new window.cc.Color(r, g, b, node.color ? node.color.a : 255);
+                    } else if (propKey === 'opacity') {
+                        node.opacity = Math.max(0, Math.min(255, parseInt(value, 10) || 0));
                     } else {
                         node[propKey] = value;
                     }
@@ -1222,11 +1237,319 @@
                     self._isActive = false;
                     self._replayLimit = -1;
                     self._currentReplayDrawCallCount = 0;
-                    self._pendingCommands = [];
-                    self._tempBatchesData = [[]];
                     self._currentMcpBatchIndex = 0;
                     self._isFlushingBatcher = false;
                     console.log("[RenderDebugger] MVP 探针已安全撤出，游戏内归还原生管线 🛑");
+                }
+            };
+
+            // ==========================================
+            // [Phase 4: 节点拾取器 Preview Node Picker]
+            // ==========================================
+            window.__mcpNodePicker = {
+                isActive: false,
+                _onMouseMove: null,
+                _onClick: null,
+                _onKeyDown: null,
+
+                enable: function() {
+                    const self = this;
+                    if (self.isActive) return;
+                    self.isActive = true;
+                    console.log("[Node Picker] 拾取模式已开启 🎯");
+
+                    self._lastMoveTime = 0;
+                    self._lastHoverUuid = null;
+
+                    self._onMouseMove = function(e) {
+                        if (!self.isActive) return;
+                        // 节流，50ms一次
+                        const now = Date.now();
+                        if (now - self._lastMoveTime < 50) return;
+                        self._lastMoveTime = now;
+
+                        const hitNode = self.hitTest(e.clientX, e.clientY);
+                        const hitUuid = hitNode ? (hitNode.uuid || hitNode.id) : null;
+                        
+                        // 打印悬停日志 (去重防刷屏)
+                        if (hitUuid !== self._lastHoverUuid) {
+                            self._lastHoverUuid = hitUuid;
+                            if (hitNode) {
+                                console.log(`[Node Picker] Hover: ${hitNode.name} (UUID: ${hitUuid})`);
+                            }
+                        }
+
+                        if (hitUuid && window.__mcpCrawler) {
+                            window.__mcpCrawler.setHoverTarget(hitUuid);
+                        } else if (window.__mcpCrawler) {
+                            window.__mcpCrawler.setHoverTarget(null);
+                        }
+                    };
+
+                    self._onClick = function(e) {
+                        if (!self.isActive) return;
+                        // 强制阻止物理拦截被别的 Input Manager 抢占
+                        e.stopPropagation();
+                        e.preventDefault();
+                        if (typeof e.stopImmediatePropagation === 'function') {
+                            e.stopImmediatePropagation();
+                        }
+
+                        // 仅在 click 或 mouseup 确认拾取
+                        if (e.type === 'mousedown') return;
+
+                        console.log('--- [Node Picker] 开始捕获点击深度诊断 (Deep Raycast Diagnostics) ---');
+                        const hitNode = self.hitTest(e.clientX, e.clientY, true);
+                        let hitUuid = '';
+                        if (hitNode) {
+                            hitUuid = hitNode.uuid || hitNode.id;
+                            console.log(`[Node Picker] Selected Hit: ${hitNode.name} (Size: ${hitNode.width}x${hitNode.height}, UUID: ${hitUuid})`);
+                        }
+                        
+                        // 同步持久化高亮框焦点
+                        if (window.__mcpCrawler && window.__mcpCrawler.setSelectionTarget) {
+                            window.__mcpCrawler.setSelectionTarget(hitUuid || '');
+                        }
+                        
+                        // 强制发送无差别 IPC 闭环，确保面板按钮能正确复位
+                        if (window.__mcpInspector && window.__mcpInspector.sendNodeSelected) {
+                            window.__mcpInspector.sendNodeSelected(hitUuid || '');
+                        }
+                        
+                        self.disable();
+                    };
+
+                    self._onKeyDown = function(e) {
+                        if (e.key === 'Escape') {
+                            if (window.__mcpInspector && window.__mcpInspector.sendNodeSelected) {
+                                window.__mcpInspector.sendNodeSelected('');
+                            }
+                            self.disable();
+                        }
+                    };
+
+                    // 使用 document.documentElement 绑定在最顶层捕获，防止被任意阻止
+                    document.documentElement.addEventListener('mousemove', self._onMouseMove, true);
+                    document.documentElement.addEventListener('mousedown', self._onClick, true);
+                    document.documentElement.addEventListener('mouseup', self._onClick, true);
+                    document.documentElement.addEventListener('click', self._onClick, true);
+                    document.documentElement.addEventListener('keydown', self._onKeyDown, true);
+                },
+
+                disable: function() {
+                    const self = this;
+                    if (!self.isActive) return;
+                    self.isActive = false;
+                    console.log("[Node Picker] 拾取模式已关闭 🛑");
+                    
+                    if (self._onMouseMove) document.documentElement.removeEventListener('mousemove', self._onMouseMove, true);
+                    if (self._onClick) {
+                        document.documentElement.removeEventListener('mousedown', self._onClick, true);
+                        document.documentElement.removeEventListener('mouseup', self._onClick, true);
+                        document.documentElement.removeEventListener('click', self._onClick, true);
+                    }
+                    if (self._onKeyDown) document.documentElement.removeEventListener('keydown', self._onKeyDown, true);
+                    
+                    if (window.__mcpCrawler) {
+                        window.__mcpCrawler.setHoverTarget(null);
+                    }
+                },
+
+                hitTest: function(clientX, clientY, isDebug) {
+                    const eng = window.cc;
+                    if (!eng || !eng.director || !eng.view) return null;
+                    const scene = eng.director.getScene();
+                    if (!scene) return null;
+
+                    // 抓取 GameCanvas 边界，抹平缩放与偏移
+                    const canvas = document.getElementById('GameCanvas');
+                    const rect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+                    
+                    let screenPt;
+                    if (typeof eng.view.convertToLocationInView === 'function') {
+                        screenPt = eng.view.convertToLocationInView(clientX, clientY, rect);
+                    } else { // 降级方案
+                        const frameSize = eng.view.getFrameSize();
+                        const x = clientX - rect.left;
+                        const y = clientY - rect.top;
+                        screenPt = eng.v2(x * (frameSize.width / rect.width), frameSize.height - y * (frameSize.height / rect.height));
+                    }
+                    
+                    if (isDebug) {
+                        try {
+                            const fs = eng.view.getFrameSize();
+                            console.log(`[Node Picker Raycast] Input:(clientX=${clientX}, clientY=${clientY}) Rect:(left=${rect.left}, top=${rect.top}, w=${rect.width}, h=${rect.height}) FrameSize:(w=${fs.width}, h=${fs.height}) => ScreenPt:(x=${screenPt.x}, y=${screenPt.y})`);
+                        } catch(e) {}
+                    }
+
+                    // 如果没拿到 camera 数组就备用一下
+                    let cameras = [];
+                    if (eng.Camera && eng.Camera.cameras) {
+                        cameras = eng.Camera.cameras;
+                    }
+
+                    // 优先测在前部的 Camera
+                    const sortedCameras = cameras.slice().sort(function(a, b) { return b.depth - a.depth; });
+                    if (sortedCameras.length === 0) return null;
+
+                    let hitCandidates = [];
+                    let hitNode = null;
+
+                    for (let c = 0; c < sortedCameras.length; c++) {
+                        const camera = sortedCameras[c];
+                        let worldPos = screenPt;
+                        
+                        if (typeof camera.getScreenToWorldPoint === 'function') {
+                            worldPos = camera.getScreenToWorldPoint(screenPt);
+                        }
+
+                        if (isDebug) {
+                            const camName = camera.node ? camera.node.name : 'Unknown';
+                            console.log(`[Node Picker Raycast] Camera[${camName}] Depth=${camera.depth} => WorldPos:(x=${worldPos.x}, y=${worldPos.y})`);
+                        }
+
+                        function walk(node) {
+                            if (eng.Scene && node instanceof eng.Scene) {
+                                // 场景根节点特判防御，跳过常规属性检测，直接深入其子节点
+                                const children = node.children;
+                                for (let i = children.length - 1; i >= 0; i--) {
+                                    walk(children[i]);
+                                }
+                                return;
+                            }
+
+                            try {
+                                if (node.activeInHierarchy === false) {
+                                    if(isDebug) console.log(`[Trace] 深度剪枝 ${node.name}: activeInHierarchy=false`);
+                                    return;
+                                }
+                                if (node.opacity === 0 || (node.color && node.color.a === 0)) {
+                                    if(isDebug) console.log(`[Trace] 深度剪枝 ${node.name}: 透明度归零不可见`);
+                                    return;
+                                }
+                            } catch (e) {
+                                return;
+                            }
+
+                            const children = node.children;
+                            for (let i = children.length - 1; i >= 0; i--) {
+                                walk(children[i]);
+                            }
+                            
+                            // 必须等子节点都检测完，再测自身！
+                            // 因为 Cocos里父节点的 group 不对，不代表子节点的 group 被剔除！
+                            try {
+                                if ((camera.cullingMask & (1 << node.groupIndex)) === 0) {
+                                    if(isDebug) console.log(`[Trace] 忽略自身 ${node.name}: 被相机(${camera.node?camera.node.name:'Unknown'}) 的 cullingMask 剔除`);
+                                    return;
+                                }
+                            } catch (e) {
+                                return;
+                            }
+
+                            if (node.width > 0 && node.height > 0) {
+                                if (node.name === '__mcp_hover_overlay__' || node.name === '__mcp_select_overlay__') return;
+                                
+                                // 核心过滤：必须存在真实可见的渲染组件（排除空有大小但不可见的排版包裹层和交互事件幽灵层）
+                                let hasRenderComp = false;
+                                if (node._components) {
+                                    for (let k = 0; k < node._components.length; k++) {
+                                        const comp = node._components[k];
+                                        if (comp && comp.enabled === false) continue; // 禁用的组件直接无视
+                                        
+                                        const compName = comp.name || (comp.constructor ? comp.constructor.name : '');
+                                        const isRender = (eng.RenderComponent && comp instanceof eng.RenderComponent) || 
+                                                         (compName.indexOf('Sprite') > -1 || compName.indexOf('Label') > -1 || 
+                                                          compName.indexOf('RichText') > -1 || compName.indexOf('Graphics') > -1 || 
+                                                          compName.indexOf('Skeleton') > -1 || compName.indexOf('Particle') > -1 ||
+                                                          compName.indexOf('Mesh') > -1 || compName.indexOf('VideoPlayer') > -1 ||
+                                                          compName.indexOf('WebView') > -1);
+                                        
+                                        if (isRender) {
+                                            // 极度严格的幽灵节点甄别（针对用作全屏事件阻挡但无透传绘制的 Sprite 占位符）
+                                            if (compName.indexOf('Sprite') > -1) {
+                                                if (!comp.spriteFrame && !comp._spriteFrame) {
+                                                    if(isDebug) console.log(`[Trace] 剥离幽灵节点 ${node.name}: Sprite 纹理为空`);
+                                                    continue;
+                                                }
+                                            }
+                                            if (compName.indexOf('Label') > -1 || compName.indexOf('RichText') > -1) {
+                                                if (!comp.string || comp.string === '') {
+                                                    if(isDebug) console.log(`[Trace] 剥离幽灵节点 ${node.name}: 文本内容为空`);
+                                                    continue;
+                                                }
+                                            }
+                                            hasRenderComp = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                if (!hasRenderComp) {
+                                    if (isDebug) console.log(`[Filter] 跳过了 ${node.name}：无渲染组件实体 (width=${node.width}, height=${node.height})`);
+                                    return; // 排除仅有大小但无渲染物体的空节点包裹层
+                                }
+
+                                if (typeof node.getBoundingBoxToWorld === 'function') {
+                                    const bbox = node.getBoundingBoxToWorld();
+                                    if (bbox.contains(worldPos)) {
+                                        if (isDebug) console.log(`[Hit] 命中🎯 ${node.name}: BBox(${bbox.x}, ${bbox.y}, ${bbox.width}, ${bbox.height}) contains WorldPos(${worldPos.x}, ${worldPos.y})`);
+                                        const area = bbox.width * bbox.height;
+                                        if (area > 0) {
+                                            hitCandidates.push({
+                                                node: node,
+                                                area: area,
+                                                hierarchyIndex: hitCandidates.length
+                                            });
+                                        }
+                                        return null; // 继续扫描下方其他重叠层次
+                                    } else {
+                                        if (isDebug && node.name !== 'Main Camera' && node.name !== 'GameCamera' && node.name !== 'UICamera') {
+                                            console.log(`[Miss] 射线不在 ${node.name} 包围盒内: BBox(${bbox.x}, ${bbox.y}, ${bbox.width}, ${bbox.height}) vs WorldPos(${worldPos.x}, ${worldPos.y})`);
+                                        }
+                                    }
+                                }
+                            } else {
+                                if (isDebug) {
+                                    let isRender = false;
+                                    if (node._components) {
+                                        for (let k = 0; k < node._components.length; k++) {
+                                            const compName = node._components[k].name || (node._components[k].constructor ? node._components[k].constructor.name : '');
+                                            if (compName.indexOf('Sprite') > -1 || compName.indexOf('Label') > -1) {
+                                                isRender = true; break;
+                                            }
+                                        }
+                                    }
+                                    if (isRender) console.log(`[Miss] ${node.name} 虽有渲染组件但被静默抛弃, 因宽高为零 (w=${node.width}, h=${node.height})`);
+                                }
+                            }
+                            return null;
+                        }
+
+                        walk(scene);
+                    }
+                    
+                    if (hitCandidates.length > 0) {
+                        hitCandidates.sort(function(a, b) {
+                            if (a.area !== b.area) {
+                                return a.area - b.area; // 面积越小越靠前（通常代表是独立精细控件而非巨大的背景遮罩）
+                            }
+                            return b.hierarchyIndex - a.hierarchyIndex; // 面积一致时，数组压入较晚的优先（因为深度优先后搜到的往往是在上层渲染）
+                        });
+                        
+                        hitNode = hitCandidates[0].node;
+                        if (isDebug) {
+                            console.log(`[Node Picker] 候选池裁决 (${hitCandidates.length} hit): 最终胜出节点：${hitNode.name} (最优面积: ${hitCandidates[0].area})`);
+                            hitCandidates.forEach(function(can, idx) {
+                                console.log(`   #${idx}: ${can.node.name} [Area: ${can.area}]`);
+                            });
+                        }
+                    }
+                    
+                    if (hitNode) {
+                        return hitNode;
+                    }
+                    return null;
                 }
             };
             
