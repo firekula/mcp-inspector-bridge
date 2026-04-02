@@ -33,14 +33,19 @@ export function useNodeSystem(globalState: any, gameView: any, nodeTreeRef: any,
     };
 
     const onNodeSelect = (node: any, isAutoRefresh: boolean = false) => {
-        console.log(`[Vue Store Update] onNodeSelect triggered: id=${node.id}, autoRefresh=${isAutoRefresh}`);
-        console.log(`[Selection-Debug] Trigger: Panel-onNodeSelect | NodeID: ${node.id} | AutoRefresh: ${isAutoRefresh} -> Sending setSelectionTarget to WebView`);
+        console.log(`[Vue Store Update] onNodeSelect triggered: id=${node ? node.id : 'null'}, autoRefresh=${isAutoRefresh}`);
+        console.log(`[Selection-Debug] Trigger: Panel-onNodeSelect | NodeID: ${node ? node.id : 'null'} | AutoRefresh: ${isAutoRefresh} -> Sending setSelectionTarget to WebView`);
         const wv: any = gameView.value;
         if (wv) {
             try {
-                const selCode = `if(window.__mcpCrawler && window.__mcpCrawler.setSelectionTarget){ window.__mcpCrawler.setSelectionTarget('${node.id}'); }`;
+                const selCode = `if(window.__mcpCrawler && window.__mcpCrawler.setSelectionTarget){ window.__mcpCrawler.setSelectionTarget(${node ? "'" + node.id + "'" : "null"}); }`;
                 wv.executeJavaScript(selCode).catch(() => {});
             } catch (e) {}
+
+            if (!node) {
+                if (!isAutoRefresh) globalState.nodeDetail = null;
+                return;
+            }
 
             const code = `window.__mcpCrawler ? JSON.stringify(window.__mcpCrawler.getNodeDetail('${node.id}')) : null`;
             wv.executeJavaScript(code).then((res: string) => {

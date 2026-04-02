@@ -10,7 +10,7 @@ export const NodeTree = {
     },
     emits: ['select', 'hover'],
     template: `
-        <div class="node-tree-wrap">
+        <div class="node-tree-wrap" @click="onContainerClick">
             <div class="search-bar" style="position: relative;">
                 <input type="text" v-model="searchQuery" placeholder="🔍 搜索节点名称..." style="padding-right: 24px;" />
                 <span v-if="searchQuery" @click="clearSearch" title="清空搜索与定位"
@@ -277,6 +277,17 @@ export const NodeTree = {
             searchQuery.value = '';
         };
 
+        const onContainerClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('.search-bar') || target.closest('.tree-node')) {
+                return;
+            }
+            if (selectedId.value !== '') {
+                selectedId.value = '';
+                emit('select', null);
+            }
+        };
+
         const highlight = (name: string, isMatch?: boolean) => {
             if (isMatch === false) return name; // 搜索模式下此节点并不匹配
             const queries = searchQuery.value.trim().split(/\s+/).filter(Boolean);
@@ -311,7 +322,8 @@ export const NodeTree = {
             getPrefabClass,
             expandToNode,
             hoverNode,
-            clearHover
+            clearHover,
+            onContainerClick
         };
     }
 };
