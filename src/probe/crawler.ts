@@ -38,19 +38,28 @@ export function initCrawler() {
                 }
             } catch(e) {}
 
+            let sx = 1, sy = 1;
+            if ('scale' in node && typeof node.scale === 'object' && 'x' in node.scale) {
+                sx = node.scale.x !== undefined ? node.scale.x : 1;
+                sy = node.scale.y !== undefined ? node.scale.y : 1;
+            } else {
+                sx = node.scaleX !== undefined ? node.scaleX : 1;
+                sy = node.scaleY !== undefined ? node.scaleY : 1;
+            }
+
             const detail = {
                 id: node.uuid || node.id,
                 name: node.name,
                 isScene: false,
                 prefabUuid: prefabUuid,
                 active: isActive,
-                x: node.x || 0,
-                y: node.y || 0,
-                rotation: ('angle' in node) ? -node.angle : (node.rotation || 0),
-                scaleX: node.scaleX || 1,
-                scaleY: node.scaleY || 1,
-                width: node.width || 0,
-                height: node.height || 0,
+                x: node.x !== undefined ? node.x : 0,
+                y: node.y !== undefined ? node.y : 0,
+                rotation: ('angle' in node) ? -node.angle : (node.rotation !== undefined ? node.rotation : 0),
+                scaleX: sx,
+                scaleY: sy,
+                width: node.width !== undefined ? node.width : 0,
+                height: node.height !== undefined ? node.height : 0,
                 anchorX: node.anchorX !== undefined ? node.anchorX : 0.5,
                 anchorY: node.anchorY !== undefined ? node.anchorY : 0.5,
                 color: node.color ? '#' + node.color.toHEX() : '#ffffff',
@@ -193,6 +202,15 @@ export function initCrawler() {
                         node.color = new window.cc.Color(r, g, b, node.color ? node.color.a : 255);
                     } else if (propKey === 'opacity') {
                         node.opacity = Math.max(0, Math.min(255, parseInt(value, 10) || 0));
+                    } else if (propKey === 'scaleX' || propKey === 'scaleY') {
+                        if ('scale' in node && typeof node.scale === 'object' && 'x' in node.scale) {
+                            let vec = node.scale;
+                            if (propKey === 'scaleX') vec.x = value;
+                            if (propKey === 'scaleY') vec.y = value;
+                            node.scale = vec;
+                        } else {
+                            node[propKey] = value;
+                        }
                     } else {
                         node[propKey] = value;
                     }

@@ -40,6 +40,10 @@
   - **问题**：操作栏固定 `height: 35px` + `overflow: hidden`，极窄时分辨率 `<select>` 被压扁到 0px
   - **方案**：`min-height` + `flex-wrap: wrap` 自动折行 + `min-width: 120px` 保护 + CSS `order` 重排窄模式元素布局
 
+- **修复节点属性提取短路导致缩放置零失效及引擎缩放适配问题 (Inspector Scale Panel Nullification Fix)**
+  - **问题**：原先用于安全回退的 `scaleX || 1` 在遇到合法的 `0` 值时引发 JS 短路错误，导致缩小到 0 的节点在面板错误展示为 1。同时未适配部分引擎版本的 `Vec3` 类型 `scale` 属性导致直接写入 `scaleX` 无效。
+  - **方案**：改用精确的 `!== undefined` 取代 `||` 判断，修复了包括坐标、宽高、旋转及缩放等全面数值的 Falsy 截断漏洞。并在探针写入侧拦截 `scaleX/scaleY` 的单轴事件，当检测到纯对象形式的 `scale` 存在时代理重组为整体赋值触发 Setter，无缝向下兼容引擎缩放内核逻辑。
+
 ---
 
 ## [0.0.8] - 2026-04-02

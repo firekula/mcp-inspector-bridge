@@ -1,6 +1,6 @@
 [
   {
-    "type": "cc.Camera",
+    "type": "cc.Sprite",
     "value": {
       "_name": {
         "type": "String",
@@ -12,18 +12,18 @@
       },
       "node": {
         "value": {
-          "name": "New 2D Camera",
-          "uuid": "91KmtXcIFEOJWOiogKZtcm"
+          "name": "bigFrame",
+          "uuid": "a5W/cb91lAl7B2n8WKdHwb"
         },
         "type": "cc.Node"
       },
       "name": {
         "type": "String",
-        "value": "New 2D Camera<Camera>"
+        "value": "bigFrame<Sprite>"
       },
       "uuid": {
         "type": "String",
-        "value": "d6xI7YEppFNofk7NvX8GNt"
+        "value": "96BJHid5FPBKI5LqjRbN6b"
       },
       "__scriptAsset": {
         "type": "cc.Script",
@@ -47,145 +47,127 @@
         "type": "Float",
         "value": 16384
       },
-      "_cullingMask": {
-        "type": "Float",
-        "value": -4
+      "_materials": {
+        "type": "cc.Material",
+        "value": [
+          {
+            "type": "cc.MaterialVariant",
+            "value": {
+              "uuid": "eca5d2f2-8ef6-41c2-bbe6-f9c79d09c432"
+            }
+          }
+        ]
       },
-      "_clearFlags": {
-        "type": "Float",
-        "value": 2
+      "materials": {
+        "type": "cc.Material",
+        "value": [
+          {
+            "type": "cc.MaterialVariant",
+            "value": {
+              "uuid": "eca5d2f2-8ef6-41c2-bbe6-f9c79d09c432"
+            }
+          }
+        ]
       },
-      "_backgroundColor": {
-        "type": "cc.Color",
+      "_srcBlendFactor": {
+        "type": "Float",
+        "value": 770
+      },
+      "_dstBlendFactor": {
+        "type": "Float",
+        "value": 771
+      },
+      "srcBlendFactor": {
+        "type": "Enum",
+        "value": 770
+      },
+      "dstBlendFactor": {
+        "type": "Enum",
+        "value": 771
+      },
+      "_spriteFrame": {
+        "type": "cc.SpriteFrame",
         "value": {
-          "r": 0,
-          "g": 0,
-          "b": 0,
-          "a": 255
+          "uuid": "12d13f8c-c544-4696-bc75-5c35f3cee88c"
         }
       },
-      "_depth": {
+      "_type": {
+        "type": "Float",
+        "value": 0
+      },
+      "_sizeMode": {
         "type": "Float",
         "value": 1
       },
-      "_zoomRatio": {
+      "_fillType": {
         "type": "Float",
-        "value": 1
+        "value": 0
       },
-      "_targetTexture": {
-        "type": "Object",
-        "value": null
-      },
-      "_fov": {
-        "type": "Float",
-        "value": 60
-      },
-      "_orthoSize": {
-        "type": "Float",
-        "value": 10
-      },
-      "_nearClip": {
-        "type": "Float",
-        "value": 0.1
-      },
-      "_farClip": {
-        "type": "Float",
-        "value": 4096
-      },
-      "_ortho": {
-        "type": "Boolean",
-        "value": true
-      },
-      "_rect": {
-        "type": "cc.Rect",
-        "value": {
-          "x": 0,
-          "y": 0,
-          "width": 1,
-          "height": 1
-        }
-      },
-      "_renderStages": {
-        "type": "Float",
-        "value": 1
-      },
-      "_alignWithScreen": {
-        "type": "Boolean",
-        "value": true
-      },
-      "zoomRatio": {
-        "type": "Float",
-        "value": 1
-      },
-      "fov": {
-        "type": "Float",
-        "value": 60
-      },
-      "orthoSize": {
-        "type": "Float",
-        "value": 10
-      },
-      "nearClip": {
-        "type": "Float",
-        "value": 0.1
-      },
-      "farClip": {
-        "type": "Float",
-        "value": 4096
-      },
-      "ortho": {
-        "type": "Boolean",
-        "value": true
-      },
-      "rect": {
-        "type": "cc.Rect",
+      "_fillCenter": {
+        "type": "cc.Vec2",
         "value": {
           "x": 0,
-          "y": 0,
-          "width": 1,
-          "height": 1
+          "y": 0
         }
       },
-      "cullingMask": {
+      "_fillStart": {
         "type": "Float",
-        "value": -4
+        "value": 0
       },
-      "clearFlags": {
+      "_fillRange": {
         "type": "Float",
-        "value": 2
+        "value": 0
       },
-      "backgroundColor": {
-        "type": "cc.Color",
-        "value": {
-          "r": 0,
-          "g": 0,
-          "b": 0,
-          "a": 255
-        }
-      },
-      "depth": {
-        "type": "Float",
-        "value": 1
-      },
-      "targetTexture": {
-        "type": "Object",
-        "value": null
-      },
-      "renderStages": {
-        "type": "Float",
-        "value": 1
-      },
-      "alignWithScreen": {
+      "_isTrimmedMode": {
         "type": "Boolean",
         "value": true
       },
-      "_is3D": {
+      "_atlas": {
+        "type": "cc.SpriteAtlas",
+        "value": {
+          "uuid": ""
+        }
+      },
+      "spriteFrame": {
+        "type": "cc.SpriteFrame",
+        "value": {
+          "uuid": "12d13f8c-c544-4696-bc75-5c35f3cee88c"
+        }
+      },
+      "type": {
+        "type": "Enum",
+        "value": 0
+      },
+      "fillType": {
+        "type": "Enum",
+        "value": 0
+      },
+      "fillCenter": {
+        "type": "cc.Vec2",
+        "value": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "fillStart": {
+        "type": "Float",
+        "value": 0
+      },
+      "fillRange": {
+        "type": "Float",
+        "value": 0
+      },
+      "trim": {
         "type": "Boolean",
-        "value": false
+        "value": true
+      },
+      "sizeMode": {
+        "type": "Enum",
+        "value": 1
       },
       "_id": {
         "type": "string",
-        "value": "d6xI7YEppFNofk7NvX8GNt"
+        "value": "96BJHid5FPBKI5LqjRbN6b"
       }
     }
   }
