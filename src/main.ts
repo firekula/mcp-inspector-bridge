@@ -1,7 +1,11 @@
 'use strict';
+import * as WebSocket from 'ws';
 declare const Editor: any;
 
 let _isSceneActive = false;
+
+let _wss: WebSocket.Server | null = null;
+let _mcpStatus = { active: false, port: 4456, error: 'Initializing...' };
 
 /**
  * mcp-inspector-bridge: 主进程入口
@@ -10,9 +14,53 @@ module.exports = {
     load() {
         // [Backend] 启动时假定场景还未完全就绪，等待 scene:ready
         _isSceneActive = false;
+        
+        try {
+            _wss = new WebSocket.Server({ port: 4456 });
+            _wss.on('connection', (ws) => {
+                ws.on('message', (message) => {
+                    try {
+                        const data = JSON.parse(message.toString());
+                        if (data.type === 'ping') {
+                            ws.send(JSON.stringify({ type: 'pong' }));
+                        } else if (data.method === 'tools/call' && data.params && data.params.name === 'get_selected_node') {
+                            const reqId = data.id || Date.now().toString();
+                            Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'mcp-query-selected-node', reqId, (err: any, res: any) => {
+                                let contentText = '';
+                                if (err || !res || res.error) {
+                                    contentText = JSON.stringify({ error: err || (res && res.error) || 'Unknown IPC error' });
+                                } else if (!res.result) {
+                                    contentText = "未选中任何节点。";
+                                } else {
+                                    contentText = JSON.stringify(res.result, null, 2) + "\n\n*注意：修改此节点请使用 execute_cocos_script 工具，并调用 cc.find('...') 获取引用。*";
+                                }
+                                ws.send(JSON.stringify({
+                                    jsonrpc: "2.0",
+                                    id: reqId,
+                                    result: {
+                                        content: [{ type: "text", text: contentText }]
+                                    }
+                                }));
+                            }, 2000);
+                        }
+                    } catch(e) {}
+                });
+            });
+            _mcpStatus = { active: true, port: 4456, error: '' };
+            Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'mcp-status-changed', _mcpStatus);
+            Editor.log('[MCP] Bridge started on ws://localhost:4456');
+        } catch(err: any) {
+            _mcpStatus = { active: false, port: 4456, error: err.message || 'Unknown error' };
+            Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'mcp-status-changed', _mcpStatus);
+            Editor.error('[MCP] Failed to start WebSocket server:', err);
+        }
     },
 
     unload() {
+        if (_wss) {
+            _wss.close();
+            _wss = null;
+        }
     },
 
     // 注册跨进程 IPC 消息侦听器
@@ -38,6 +86,11 @@ module.exports = {
                 // 也可通过向 scene 面板发信检查双保险
                 const active = _isSceneActive !== false;
                 event.reply(null, active);
+            }
+        },
+        'query-mcp-status'(event: any) {
+            if (event.reply) {
+                event.reply(null, _mcpStatus);
             }
         },
         'query-node-tree'(event: any) {

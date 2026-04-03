@@ -119,10 +119,21 @@ module.exports = Editor.Panel.extend({
                     gameViewSystem.setupGameViewListeners();
                     devToolsSystem.setupDevToolsWatchers();
                     profilerSystem.setupProfilerWatchers();
-                    
                     if (panelAppElement) {
                         panelAppElement.style.zoom = globalState.uiScale.toString();
                         panelAppElement.style.setProperty('--base-font-size', globalState.baseFontSize + 'px');
+                    }
+                    
+                    window.addEventListener('mcp-status-changed', ((e: CustomEvent) => {
+                        globalState.mcpStatus = e.detail;
+                    }) as EventListener);
+                    
+                    if (typeof Editor !== 'undefined') {
+                        Editor.Ipc.sendToMain('mcp-inspector-bridge:query-mcp-status', (err: any, status: any) => {
+                            if (status) {
+                                globalState.mcpStatus = status;
+                            }
+                        });
                     }
                 });
 
@@ -148,8 +159,39 @@ module.exports = Editor.Panel.extend({
     },
 
     messages: {
+        'mcp-query-selected-node'(this: any, event: any, reqId: string) {
+            const wv: any = this.shadowRoot ? this.shadowRoot.querySelector('#game-view') : null;
+            if (!wv) {
+                if (event.reply) event.reply(null, { reqId, error: "Game view not found" });
+                return;
+            }
+            const code = `
+                (function(){
+                    if(!window.__mcpHighlightData || !window.__mcpHighlightData.selectId) return null;
+                    if(!window.__mcpCrawler || typeof window.__mcpCrawler.getSimplifiedNode !== 'function') return null;
+                    return JSON.stringify(window.__mcpCrawler.getSimplifiedNode(window.__mcpHighlightData.selectId));
+                })();
+            `;
+            try {
+                const promise = wv.executeJavaScript(code);
+                if (promise && promise.then) {
+                    promise.then((res: any) => {
+                        if (event.reply) event.reply(null, { reqId, result: res ? JSON.parse(res) : null });
+                    }).catch((e: any) => {
+                        if (event.reply) event.reply(null, { reqId, error: "Execution failed in promise: " + e.message });
+                    });
+                } else {
+                    if (event.reply) event.reply(null, { reqId, error: "executeJavaScript did not return a promise" });
+                }
+            } catch (e: any) {
+                if (event.reply) event.reply(null, { reqId, error: "executeJavaScript sync throw: " + e.message });
+            }
+        },
         'scene-status-changed'(event: any, payload: any) {
             window.dispatchEvent(new CustomEvent('scene-status-changed', { detail: payload }));
+        },
+        'mcp-status-changed'(event: any, payload: any) {
+            window.dispatchEvent(new CustomEvent('mcp-status-changed', { detail: payload }));
         }
     },
 

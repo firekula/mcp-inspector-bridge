@@ -8,6 +8,15 @@
 
 ### ✨ 新特性
 
+- **MCP 接入第一阶段 (MCP Integration Stage 1)**
+  - 架构更新：增加了依赖建立于 `4456` 端口连接的 MCP-Inspector WebSocket 通信桥。
+  - 新增 `mcp-client` 作为纯 Node 探针客户端，负责和中控建立 `ping/pong` 验证闭环。
+
+- **MCP 接入第二阶段 (MCP Integration Stage 2)**
+  - **JSON-RPC 只读探针**：增加基于 JSON-RPC 规范的 `get_selected_node` 操作，为 AI 开启只读探针视镜并防幻觉泛化。
+  - 优化底层探针序列化管线，部署专为大语言模型打造的 `getSimplifiedNode` 精简接口。
+
+
 - **支持全局 UI 缩放与设置面板 (Global UI Scaling and Settings Panel)**
   - 在右侧标签栏增加了专属的“设置 (⚙️)”入口。
   - 通过操作 `#app` DOM 容器级的独立 CSS `zoom` 取代全局 `webFrame` 倍率，防范了缩放对其他编辑器面板的跨界污染。
@@ -35,6 +44,10 @@
 - **修复 UI 缩放与面板宽边界变动时开发者工具视图未同步裁切对齐问题 (BrowserView Out-of-Sync Fix)**
   - **问题**：原生脱离 DOM 的 BrowserView 没有主动响应 CSS `zoom` 和窗体宽窄拖拉的机制；且在 Chromium 59 旧内核下，带有 `zoom` 属性的容器调用 `getBoundingClientRect()` 会返回被虚假拉伸放大的不标准坐标，导致包围盒投影不仅没有收缩对齐，反而向外越界漂移穿模。
   - **方案**：引入 `rightPanelWidth` 侦听绑定，以及 `setTimeout(20ms)` 的脱管空窗补偿；并在最终包围盒校准环节废除锚点求差法，直接将返回的 `rect` 属性执行 `* uiScale` 重组为纯粹的绝对物理屏幕像素轴。
+
+- **修复 Vue Shadow DOM 下的 IPC 调用失效与超时崩溃 (IPC Shadow DOM Fix)**
+  - **问题**：`get_selected_node` 时面板上的 `document.querySelector('#game-view')` 无法突破 Vue 在插件面板创建的隔离树，并因为同步抛回错误导致 `Editor.Ipc.sendToPanel` 漏接 Promise `catch` 而出现 `ETIMEOUT` 事件死循环。
+  - **方案**：使用原生的 `this.shadowRoot.querySelector` 强行击穿隔离直接捞取底层活跃 Webview，同时在周边使用严密的 `try-catch` 防止同步调用漏斗崩溃。
 
 - **修复极窄面板下分辨率选择框不可读 (Toolbar Responsive Wrap)**
   - **问题**：操作栏固定 `height: 35px` + `overflow: hidden`，极窄时分辨率 `<select>` 被压扁到 0px

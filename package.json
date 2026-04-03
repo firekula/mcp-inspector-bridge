@@ -5,8 +5,8 @@
 	"author": "Firekula",
 	"main": "dist/main.js",
 	"scripts": {
-		"build": "tsc && esbuild src/probe/index.ts --bundle --outfile=dist/probe.js",
-		"watch": "tsc -w & esbuild src/probe/index.ts --bundle --outfile=dist/probe.js --watch"
+		"build": "tsc && esbuild src/probe/index.ts --bundle --outfile=dist/probe.js && esbuild src/mcp-client/index.ts --bundle --platform=node --outfile=dist/mcp-client/index.js",
+		"watch": "tsc -w & esbuild src/probe/index.ts --bundle --outfile=dist/probe.js --watch & esbuild src/mcp-client/index.ts --bundle --platform=node --outfile=dist/mcp-client/index.js --watch"
 	},
 	"main-menu": {
 		"MCP 桥接器/开启运行时面板": {
@@ -23,10 +23,12 @@
 	},
 	"devDependencies": {
 		"@types/node": "^25.5.0",
+		"@types/ws": "^8.18.1",
 		"esbuild": "^0.27.4",
 		"typescript": "^6.0.2"
 	},
 	"dependencies": {
-		"vue": "^3.5.31"
+		"vue": "^3.5.31",
+		"ws": "^8.20.0"
 	}
 }

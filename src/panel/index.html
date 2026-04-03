@@ -100,6 +100,9 @@ mark { background: #0078d4; color: white; padding: 0 2px; border-radius: 2px;}
                 <button class="icon-btn" title="性能状态 (FPS)" @click="toggleFPS">{{ isShowFPS ? '📊' : '📉' }}</button>
                 <button class="icon-btn" title="静音/开启游戏声音" @click="toggleMute">{{ isAudioMuted ? '🔇' : '🔊' }}</button>
                 <button :class="['icon-btn', globalState.isNodePickerActive ? 'active' : '']" :style="{ color: globalState.isNodePickerActive ? '#09f' : '#ccc', borderColor: globalState.isNodePickerActive ? '#09f' : '#555' }" title="场景节点拾取" @click="toggleNodePicker">🎯</button>
+                <button class="icon-btn" style="cursor:help" :title="globalState.mcpStatus.active ? 'MCP已启动，端口：' + globalState.mcpStatus.port : 'MCP启动失败，原因：' + globalState.mcpStatus.error">
+                    <div :style="{ width: '10px', height: '10px', borderRadius: '50%', background: globalState.mcpStatus.active ? '#4caf50' : '#f44336' }"></div>
+                </button>
             </div>
             <!-- 分辨率与横竖屏分组 (保证自动换行时不被切割) -->
             <div style="display: flex; gap: 5px; flex: 1; min-width: 200px;">

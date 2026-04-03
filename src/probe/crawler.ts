@@ -356,6 +356,26 @@ export function initCrawler() {
                 Logger.log(`[Selection-Debug] Trigger: Probe-Crawler-setSelectionTarget | NodeID: ${uuid}`);
                 window.__mcpHighlightData.selectId = uuid;
             }
+        },
+        getSimplifiedNode: function (uuid) {
+            const node = this.findNodeByUuid(uuid);
+            if (!node || !node.isValid) return null;
+            let compNames = [];
+            if (node._components) {
+                compNames = node._components.map(function(c) {
+                    let cname = c.name || c.__classname__ || "Unknown";
+                    const m = cname.match(/<([^>]+)>/);
+                    return m ? m[1] : cname;
+                });
+            }
+            return {
+                name: node.name,
+                uuid: node.uuid || node.id,
+                active: node.active !== false,
+                position: { x: node.x || 0, y: node.y || 0 },
+                size: { width: node.width || 0, height: node.height || 0 },
+                components: compNames
+            };
         }
     };
 }
