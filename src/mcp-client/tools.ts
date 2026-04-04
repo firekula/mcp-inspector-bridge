@@ -92,6 +92,11 @@ export function setupTools(server: Server, sendRpcToCocos: (method: string, args
                         }, 
                         required: [] 
                     },
+                },
+                {
+                    name: "get_runtime_stats",
+                    description: "Get current game runtime performance stats including FPS, DrawCall and CPU logic/render times.",
+                    inputSchema: { type: "object", properties: {}, required: [] },
                 }
             ],
         };

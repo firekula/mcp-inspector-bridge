@@ -2,6 +2,8 @@ import WebSocket from 'ws';
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { setupTools } from './tools';
+import { setupResources } from './resources';
+import { setupPrompts } from './prompts';
 
 const server = new Server(
     {
@@ -11,6 +13,8 @@ const server = new Server(
     {
         capabilities: {
             tools: {},
+            resources: {},
+            prompts: {},
         },
     }
 );
@@ -78,6 +82,8 @@ function sendRpcToCocos(methodName: string, args: any = {}): Promise<any> {
 }
 
 setupTools(server, sendRpcToCocos);
+setupResources(server, sendRpcToCocos);
+setupPrompts(server);
 
 async function runServer() {
     const transport = new StdioServerTransport();

@@ -4,6 +4,17 @@
 
 ---
 
+## [0.1.0] - 2026-04-04
+
+### ✨ 新特性
+
+- **MCP 基础资源与性能分析加强**
+  - 接入 `@modelcontextprotocol/sdk` 中的 `resources` 接口，暴露出 `scene://hierarchy` 的数据源。
+  - 引入 `prompts` 支持，定义了 `cocos-api-24x` 防幻觉提示词。
+  - 新增工具 `get_runtime_stats` 以配合性能面板监测当前游戏的帧率、渲染耗时和并发的 DrawCall。
+
+---
+
 ## [0.0.9] - 2026-04-02
 
 ### ✨ 新特性

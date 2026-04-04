@@ -392,6 +392,22 @@ module.exports = Editor.Panel.extend({
               .then((r:any) => { if(event.reply) event.reply(null, typeof r === 'string' ? JSON.parse(r) : r); })
               .catch((e:any) => { if(event.reply) event.reply(null, { error: e.message }); });
         },
+        'mcp-query-stats'(this: any, event: any, args: any) {
+            const wv: any = this.shadowRoot ? this.shadowRoot.querySelector('#game-view') : null;
+            if(!wv) { if (event.reply) event.reply(null, { error: 'No WebView' }); return; }
+            
+            const code = `
+                (function(){
+                    try {
+                        if(typeof window.__mcpProfilerTick !== 'function') return JSON.stringify({ error: 'Profiler not injected' });
+                        return JSON.stringify(window.__mcpProfilerTick());
+                    } catch(e) { return JSON.stringify({ error: 'EXECUTION_FAILED', msg: e.message }); }
+                })();
+            `;
+            wv.executeJavaScript(code)
+              .then((r:any) => { if(event.reply) event.reply(null, typeof r === 'string' ? JSON.parse(r) : r); })
+              .catch((e:any) => { if(event.reply) event.reply(null, { error: e.message }); });
+        },
         'scene-status-changed'(event: any, payload: any) {
             window.dispatchEvent(new CustomEvent('scene-status-changed', { detail: payload }));
         },
