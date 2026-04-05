@@ -1,6 +1,6 @@
 [
   {
-    "type": "cc.Sprite",
+    "type": "cc.Label",
     "value": {
       "_name": {
         "type": "String",
@@ -12,18 +12,18 @@
       },
       "node": {
         "value": {
-          "name": "bigFrame",
-          "uuid": "a5W/cb91lAl7B2n8WKdHwb"
+          "name": "LabelNode",
+          "uuid": "1drd0hVoBCcaQij/Q+jzIN"
         },
         "type": "cc.Node"
       },
       "name": {
         "type": "String",
-        "value": "bigFrame<Sprite>"
+        "value": "LabelNode<Label>"
       },
       "uuid": {
         "type": "String",
-        "value": "96BJHid5FPBKI5LqjRbN6b"
+        "value": "27qAn7SyZJxaDsOYzDZieo"
       },
       "__scriptAsset": {
         "type": "cc.Script",
@@ -85,89 +85,355 @@
         "type": "Enum",
         "value": 771
       },
-      "_spriteFrame": {
-        "type": "cc.SpriteFrame",
-        "value": {
-          "uuid": "12d13f8c-c544-4696-bc75-5c35f3cee88c"
-        }
+      "_string": {
+        "type": "String",
+        "value": "新文本"
       },
-      "_type": {
-        "type": "Float",
+      "string": {
+        "type": "String",
+        "value": "新文本"
+      },
+      "horizontalAlign": {
+        "type": "Enum",
         "value": 0
       },
-      "_sizeMode": {
-        "type": "Float",
-        "value": 1
-      },
-      "_fillType": {
-        "type": "Float",
+      "verticalAlign": {
+        "type": "Enum",
         "value": 0
       },
-      "_fillCenter": {
-        "type": "cc.Vec2",
-        "value": {
-          "x": 0,
-          "y": 0
-        }
-      },
-      "_fillStart": {
+      "actualFontSize": {
         "type": "Float",
+        "value": 40
+      },
+      "_fontSize": {
+        "type": "Float",
+        "value": 40
+      },
+      "fontSize": {
+        "type": "Float",
+        "value": 40
+      },
+      "fontFamily": {
+        "type": "String",
+        "value": "Arial"
+      },
+      "_lineHeight": {
+        "type": "Float",
+        "value": 40
+      },
+      "lineHeight": {
+        "type": "Float",
+        "value": 40
+      },
+      "overflow": {
+        "type": "Enum",
         "value": 0
       },
-      "_fillRange": {
-        "type": "Float",
-        "value": 0
-      },
-      "_isTrimmedMode": {
+      "_enableWrapText": {
         "type": "Boolean",
         "value": true
       },
-      "_atlas": {
-        "type": "cc.SpriteAtlas",
+      "enableWrapText": {
+        "type": "Boolean",
+        "value": true
+      },
+      "_N$file": {
+        "type": "Object",
+        "value": null
+      },
+      "font": {
+        "type": "cc.Font",
         "value": {
           "uuid": ""
         }
       },
-      "spriteFrame": {
-        "type": "cc.SpriteFrame",
-        "value": {
-          "uuid": "12d13f8c-c544-4696-bc75-5c35f3cee88c"
-        }
-      },
-      "type": {
-        "type": "Enum",
-        "value": 0
-      },
-      "fillType": {
-        "type": "Enum",
-        "value": 0
-      },
-      "fillCenter": {
-        "type": "cc.Vec2",
-        "value": {
-          "x": 0,
-          "y": 0
-        }
-      },
-      "fillStart": {
-        "type": "Float",
-        "value": 0
-      },
-      "fillRange": {
-        "type": "Float",
-        "value": 0
-      },
-      "trim": {
+      "_isSystemFontUsed": {
         "type": "Boolean",
         "value": true
       },
-      "sizeMode": {
+      "useSystemFont": {
+        "type": "Boolean",
+        "value": true
+      },
+      "_bmFontOriginalSize": {
+        "type": "Float",
+        "value": -1
+      },
+      "_spacingX": {
+        "type": "Float",
+        "value": 0
+      },
+      "spacingX": {
+        "type": "Float",
+        "value": 0
+      },
+      "_batchAsBitmap": {
+        "type": "Boolean",
+        "value": false
+      },
+      "cacheMode": {
         "type": "Enum",
-        "value": 1
+        "value": 0
+      },
+      "_styleFlags": {
+        "type": "Float",
+        "value": 0
+      },
+      "enableBold": {
+        "type": "Boolean",
+        "value": false
+      },
+      "enableItalic": {
+        "type": "Boolean",
+        "value": false
+      },
+      "enableUnderline": {
+        "type": "Boolean",
+        "value": false
+      },
+      "_underlineHeight": {
+        "type": "Float",
+        "value": 0
+      },
+      "underlineHeight": {
+        "type": "Float",
+        "value": 0
+      },
+      "_N$horizontalAlign": {
+        "type": "Float",
+        "value": 0
+      },
+      "_N$verticalAlign": {
+        "type": "Float",
+        "value": 0
+      },
+      "_N$fontFamily": {
+        "type": "String",
+        "value": "Arial"
+      },
+      "_N$overflow": {
+        "type": "Float",
+        "value": 0
+      },
+      "_N$cacheMode": {
+        "type": "Float",
+        "value": 0
       },
       "_id": {
         "type": "string",
-        "value": "96BJHid5FPBKI5LqjRbN6b"
+        "value": "27qAn7SyZJxaDsOYzDZieo"
+      }
+    }
+  },
+  {
+    "type": "cc.Widget",
+    "value": {
+      "_name": {
+        "type": "String",
+        "value": ""
+      },
+      "_objFlags": {
+        "type": "Float",
+        "value": 63488
+      },
+      "node": {
+        "value": {
+          "name": "LabelNode",
+          "uuid": "1drd0hVoBCcaQij/Q+jzIN"
+        },
+        "type": "cc.Node"
+      },
+      "name": {
+        "type": "String",
+        "value": "LabelNode<Widget>"
+      },
+      "uuid": {
+        "type": "String",
+        "value": "f8l7RXCbxElLjUY7tmv45c"
+      },
+      "__scriptAsset": {
+        "type": "cc.Script",
+        "value": {
+          "uuid": ""
+        }
+      },
+      "_enabled": {
+        "type": "Boolean",
+        "value": true
+      },
+      "enabled": {
+        "type": "Boolean",
+        "value": true
+      },
+      "enabledInHierarchy": {
+        "type": "Boolean",
+        "value": true
+      },
+      "_isOnLoadCalled": {
+        "type": "Float",
+        "value": 16384
+      },
+      "target": {
+        "type": "cc.Node",
+        "value": {
+          "uuid": ""
+        }
+      },
+      "isAlignTop": {
+        "type": "Boolean",
+        "value": true
+      },
+      "isAlignVerticalCenter": {
+        "type": "Boolean",
+        "value": false
+      },
+      "isAlignBottom": {
+        "type": "Boolean",
+        "value": false
+      },
+      "isAlignLeft": {
+        "type": "Boolean",
+        "value": false
+      },
+      "isAlignHorizontalCenter": {
+        "type": "Boolean",
+        "value": true
+      },
+      "isAlignRight": {
+        "type": "Boolean",
+        "value": false
+      },
+      "isStretchWidth": {
+        "type": "Boolean",
+        "value": false
+      },
+      "isStretchHeight": {
+        "type": "Boolean",
+        "value": false
+      },
+      "top": {
+        "type": "Float",
+        "value": 0
+      },
+      "bottom": {
+        "type": "Float",
+        "value": 0
+      },
+      "left": {
+        "type": "Float",
+        "value": 0
+      },
+      "right": {
+        "type": "Float",
+        "value": 0
+      },
+      "horizontalCenter": {
+        "type": "Float",
+        "value": 0
+      },
+      "verticalCenter": {
+        "type": "Float",
+        "value": 0
+      },
+      "isAbsoluteHorizontalCenter": {
+        "type": "Boolean",
+        "value": true
+      },
+      "isAbsoluteVerticalCenter": {
+        "type": "Boolean",
+        "value": true
+      },
+      "isAbsoluteTop": {
+        "type": "Boolean",
+        "value": true
+      },
+      "isAbsoluteBottom": {
+        "type": "Boolean",
+        "value": true
+      },
+      "isAbsoluteLeft": {
+        "type": "Boolean",
+        "value": true
+      },
+      "isAbsoluteRight": {
+        "type": "Boolean",
+        "value": true
+      },
+      "alignMode": {
+        "type": "Enum",
+        "value": 0
+      },
+      "_wasAlignOnce": {
+        "type": "Object",
+        "value": null
+      },
+      "_target": {
+        "type": "Object",
+        "value": null
+      },
+      "_alignFlags": {
+        "type": "Float",
+        "value": 17
+      },
+      "_left": {
+        "type": "Float",
+        "value": 0
+      },
+      "_right": {
+        "type": "Float",
+        "value": 0
+      },
+      "_top": {
+        "type": "Float",
+        "value": 0
+      },
+      "_bottom": {
+        "type": "Float",
+        "value": 0
+      },
+      "_verticalCenter": {
+        "type": "Float",
+        "value": 0
+      },
+      "_horizontalCenter": {
+        "type": "Float",
+        "value": 0
+      },
+      "_isAbsLeft": {
+        "type": "Boolean",
+        "value": true
+      },
+      "_isAbsRight": {
+        "type": "Boolean",
+        "value": true
+      },
+      "_isAbsTop": {
+        "type": "Boolean",
+        "value": true
+      },
+      "_isAbsBottom": {
+        "type": "Boolean",
+        "value": true
+      },
+      "_isAbsHorizontalCenter": {
+        "type": "Boolean",
+        "value": true
+      },
+      "_isAbsVerticalCenter": {
+        "type": "Boolean",
+        "value": true
+      },
+      "_originalWidth": {
+        "type": "Float",
+        "value": 0
+      },
+      "_originalHeight": {
+        "type": "Float",
+        "value": 0
+      },
+      "_id": {
+        "type": "string",
+        "value": "f8l7RXCbxElLjUY7tmv45c"
       }
     }
   }

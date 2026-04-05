@@ -265,6 +265,180 @@
         padding-top: 20px;
         font-size: calc(var(--base-font-size, 13px) - 1px);
     }
+
+    /* Modern Inspector 样式规范 */
+    :host {
+        --bg-main: #181818;
+        --bg-panel: #262626;
+        --bg-header: #333333;
+        --bg-input: #1e1e1e;
+        --accent-blue: #007acc;
+        --text-main: #d4d4d4;
+        --text-muted: #858585;
+        --border-color: #3e3e3e;
+        --radius: 3px;
+    }
+
+    .inspector-card {
+        background-color: var(--bg-panel);
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+        overflow: hidden;
+        transition: opacity 0.3s ease;
+        margin-bottom: 12px;
+    }
+
+    .inspector-card.disabled .properties-body {
+        opacity: 0.4;
+        filter: grayscale(0.5);
+    }
+
+    .component-header {
+        background-color: var(--bg-header);
+        height: 32px;
+        display: flex;
+        align-items: center;
+        padding: 0 8px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .enable-toggle {
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        border: 1px solid #666;
+        border-radius: 2px;
+        background: #222;
+        cursor: pointer;
+        position: relative;
+        margin-right: 10px;
+    }
+    .enable-toggle:checked {
+        background-color: var(--accent-blue);
+        border-color: var(--accent-blue);
+    }
+    .enable-toggle:checked::after {
+        content: '✔';
+        position: absolute;
+        color: white;
+        font-size: 10px;
+        left: 1px;
+        top: -1px;
+    }
+
+    .component-name {
+        font-weight: bold;
+        font-size: 13px;
+        letter-spacing: 0.3px;
+    }
+
+    .print-btn {
+        margin-left: 8px;
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 4px;
+        font-size: 14px;
+        transition: all 0.2s;
+    }
+    .print-btn:hover {
+        color: #fff;
+        background-color: rgba(255,255,255,0.1);
+    }
+
+    .header-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .size-tag {
+        color: #555;
+        font-size: 10px;
+        font-family: monospace;
+    }
+
+    .properties-body {
+        padding: 8px 0;
+        transition: all 0.3s;
+    }
+
+    .prop-row {
+        display: flex;
+        align-items: center;
+        padding: 3px 12px;
+        min-height: 26px;
+    }
+    .prop-row.array-row {
+        flex-wrap: wrap; 
+        align-items: flex-start;
+        padding-top: 6px;
+        padding-bottom: 6px;
+    }
+    .array-label {
+        font-style: italic;
+    }
+    .prop-row:hover { background-color: rgba(255,255,255,0.02); }
+
+    .prop-label {
+        flex: 0 0 110px;
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .prop-val {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        min-width: 0;
+    }
+    
+    .prop-val input[type="text"],
+    .prop-val input[type="number"],
+    .prop-val select {
+        width: 100%; box-sizing: border-box; 
+        padding: 2px 4px; 
+        background: var(--bg-input); 
+        color: var(--text-main); 
+        border: 1px solid var(--border-color); 
+        border-radius: var(--radius);
+        min-width: 0;
+        outline: none;
+    }
+    .prop-val input[type="text"]:focus,
+    .prop-val input[type="number"]:focus,
+    .prop-val select:focus {
+        border-color: var(--accent-blue);
+    }
+
+    .asset-link {
+        width: 100%;
+        height: 22px;
+        background: linear-gradient(180deg, #383838 0%, #2d2d2d 100%);
+        border: 1px solid #1a1a1a;
+        border-radius: var(--radius);
+        display: flex;
+        align-items: center;
+        padding: 0 6px;
+        cursor: pointer;
+        gap: 6px;
+        box-sizing: border-box;
+    }
+    .asset-link:hover { border-color: #555; }
+    
+    .asset-link i { font-size: 10px; color: #aaa; }
+    .asset-name {
+        color: #61afef;
+        font-size: 11px;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .target-mark { color: #e06c75; font-size: 12px; opacity: 0.8; }
 </style>
 
 <div id="app" v-cloak>
@@ -416,7 +590,7 @@
                         @mousedown="startNodeTreeDrag" title="拖拉调整侧栏尺寸"></div>
 
                     <div
-                        style="flex: 1; overflow-y: hidden; background: #202020; min-width: 0; min-height: 0; position: relative;">
+                        style="flex: 1; overflow-y: auto; background: var(--bg-main); min-width: 0; min-height: 0; position: relative; padding: 10px;">
                         <node-inspector :node-detail="globalState.nodeDetail" @update-prop="onUpdateNodeProp"
                             @hover-change="globalState.isInspectorHovered = $event" @locate-node="onLocateNode"
                             @locate-asset="onLocateAsset" @print-comp="onPrintComp"></node-inspector>

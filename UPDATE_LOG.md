@@ -6,8 +6,16 @@
 
 ## [Unreleased]
 ### Added
+- **现代化组件属性面板设计重构 (Modern Component Inspector UI)**: 将组件渲染的内嵌临时样式全面替换为遵循 `.inspector-card` 设计范式的 CSS Variable 体态体系，包含悬浮发光交互、渐变深色背景的 `asset-link`、以及更为紧凑整洁的层级表现，视觉更加统一和舒适。
+- **现代化数组专属排版渲染 (Modern Array Layout UI)**: 设计分岔 DOM 约束，针对 `array` 类型的字段启用分离的换层下潜弹性布局结构（附带斜体表头及元素计数信息），彻底解决原生单一横轴排列对于多数组成员产生的局促推挤和换行截断乱象。
+- **节点基础属性区风格统一 (Node Basics UI Modernization)**: 彻底消除了顶部节点基础数据区（Position, Scale, Color）与组件属性区之间的风格割裂，将基础区完全接入 `.inspector-card` 和 `.component-header`，并使用全局通用 CSS 变量格式化输入框。
+- **属性编辑器支持拉取核心组件原生枚举级联下拉 (Enum Dropdown Support in Inspector)**: 完全重构并兼容渲染继承自 `cc.Component` 的枚举类型，将编辑器原有的单纯数字化表单升级为基于 Web `<select>` 标签构建的可读性选项。并成功向下植入了超 40 种如 `Sprite.type`, `Label.horizontalAlign` 的下拉元数据。
 - **Global Info Categorization**: Enhanced the 'Cocos Environment' tab to support dynamically categorized global metrics with `<details>` accordions. Captures exhaustive context including Downloader settings, Dynamic Atlas parameters, 2D Physics metrics, and Collision system configurations.
 - **Preview Resolution Options**: Added 32+ new comprehensive device resolution presets encompassing iOS/iPadOS flagships, standard Android phones, multi-form foldables, and tablets to support thorough UI boundary tests.
+
+### Fixed
+- **修复组件数据日志导出失效 (Print Component Data Fix)**: 修复了在未开启全局日志调试变量 `__MCP_DEBUG__` 期间，点击属性面板中组件头部的 🖨️（导出/打印）按钮无法向控制台输送信息的问题。已针对用户显式触发的功能指令还原高优先级独立打印逻辑。
+- **模板闭合缺失修复 (Template Tag Fix)**: 修复了重构期间由于替换失误导致的 HTML 标签未闭合产生的 Vue 编译器警告。
 
 ## [0.1.0] - 2026-04-04
 

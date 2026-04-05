@@ -156,6 +156,31 @@ export function initCrawler() {
 
                             if (type !== "unsupported") {
                                 let enumList = null;
+                                
+                                // Test if component property relies on a Cocos Enum
+                                let eList = null;
+                                if (window.cc && window.cc.Class && typeof window.cc.Class.attr === 'function') {
+                                    const attrObj = window.cc.Class.attr(comp.constructor, key);
+                                    if (attrObj && attrObj.enumList) {
+                                        eList = attrObj.enumList;
+                                    }
+                                }
+                                if (!eList && comp.constructor && comp.constructor.__attrs__) {
+                                    eList = comp.constructor.__attrs__[key + "|enumList"];
+                                }
+                                
+                                if (eList && Array.isArray(eList)) {
+                                    // Make sure it contains {name, value} or at least valid items
+                                    if (eList.length > 0 && eList[0].name !== undefined && eList[0].value !== undefined) {
+                                        enumList = eList;
+                                        type = "Enum";
+                                    } else {
+                                        // Some EnumLists in CC are plain arrays? Convert to {name, value}
+                                        enumList = eList.map(e => (typeof e === 'object' ? e : {name: e.toString(), value: e}));
+                                        type = "Enum";
+                                    }
+                                }
+
                                 if (cname === "sp.Skeleton" || cname === "Skeleton") {
                                     if ((key === "animation" || key === "defaultAnimation") && comp.skeletonData) {
                                         try {
@@ -313,9 +338,9 @@ export function initCrawler() {
                 const match = compName.match(/<([^>]+)>/);
                 if (match) compName = match[1];
 
-                Logger.log(`%c[MCP] 组件 (${compName}) 数据导出成功 👇`, 'color: #00ff00; font-weight: bold;');
-                Logger.log(jsonStr);
-                Logger.log(`%c---------------------------------------`, 'color: #00ff00; font-weight: bold;');
+                console.log(`%c[MCP] 组件 (${compName}) 数据导出成功 👇`, 'color: #00ff00; font-weight: bold;');
+                console.log(jsonStr);
+                console.log(`%c---------------------------------------`, 'color: #00ff00; font-weight: bold;');
 
                 // 尝试写入剪贴板
                 if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
