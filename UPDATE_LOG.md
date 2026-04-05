@@ -8,6 +8,9 @@
 
 ### ✨ 新特性
 
+- **增加多渠道 MCP 自动配置支持 (Multi-channel MCP configuration support)**
+  - 面板新增支持一键识别并配置 Claude Desktop、Windsurf、Zed、VS Code (Cline / Roo Code)、Trae / Trae CN、Cherry Studio 等主流智能体宿主环境。
+
 - **MCP 基础资源与性能分析加强**
   - 接入 `@modelcontextprotocol/sdk` 中的 `resources` 接口，暴露出 `scene://hierarchy` 的数据源。
   - 引入 `prompts` 支持，定义了 `cocos-api-24x` 防幻觉提示词。

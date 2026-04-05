@@ -9,11 +9,31 @@ const isMac = process.platform === 'darwin';
 const getAppdataPath = () => process.env.APPDATA || (isWin ? process.env.USERPROFILE + '\\AppData\\Roaming' : '');
 const getMacAppSupportPath = () => process.env.HOME + '/Library/Application Support';
 const getUserProfilePath = () => process.env.USERPROFILE || process.env.HOME || '';
+const getAppDataDir = () => isWin ? getAppdataPath() : getMacAppSupportPath();
 
 const targetPaths = [
-    { name: 'Claude Code', file: path.join(getUserProfilePath(), '.claude.json') },
     { name: 'Antigravity', file: path.join(getUserProfilePath(), '.gemini', 'antigravity', 'mcp_config.json') },
-    { name: 'Trae', file: path.join(getUserProfilePath(), '.trae', 'mcp.json') }
+    { name: 'Cherry Studio', file: path.join(getAppDataDir(), 'cherry-studio', 'mcp.json') },
+    { name: 'Claude Code', file: path.join(getUserProfilePath(), '.claude.json') },
+    { name: 'Claude Desktop', file: path.join(getAppDataDir(), 'Claude', 'claude_desktop_config.json') },
+    { name: 'Cline', file: path.join(getAppDataDir(), 'Code', 'User', 'globalStorage', 'saoudrizwan.claude-dev', 'settings', 'cline_mcp_settings.json') },
+    { name: 'CodeBuddy CLI', file: path.join(getUserProfilePath(), '.codebuddy', 'mcp.json') },
+    { name: 'Codex', file: path.join(getUserProfilePath(), '.codex', 'mcp.json') },
+    { name: 'Cursor', file: path.join(getUserProfilePath(), '.cursor', 'mcp.json') },
+    { name: 'Gemini CLI', file: path.join(getUserProfilePath(), '.gemini', 'mcp.json') },
+    { name: 'GitHub Copilot CLI', file: path.join(getUserProfilePath(), '.config', 'github-copilot', 'mcp.json') },
+    { name: 'Kilo Code', file: path.join(getUserProfilePath(), '.kilo', 'mcp.json') },
+    { name: 'Kiro', file: path.join(getUserProfilePath(), '.kiro', 'mcp.json') },
+    { name: 'OpenCode', file: path.join(getUserProfilePath(), '.opencode', 'mcp.json') },
+    { name: 'Qwen Code', file: path.join(getUserProfilePath(), '.qwen', 'mcp.json') },
+    { name: 'Rider GitHub Copilot', file: path.join(getAppDataDir(), 'JetBrains', 'Rider', 'github-copilot', 'mcp.json') },
+    { name: 'Roo Code', file: path.join(getAppDataDir(), 'Code', 'User', 'globalStorage', 'rooveterinaryinc.roo-cline', 'settings', 'cline_mcp_settings.json') },
+    { name: 'Trae', file: path.join(getUserProfilePath(), '.trae', 'mcp.json') },
+    { name: 'Trae CN', file: path.join(getUserProfilePath(), '.trae-cn', 'mcp.json') },
+    { name: 'VSCode GitHub Copilot', file: path.join(getAppDataDir(), 'Code', 'User', 'globalStorage', 'github.copilot', 'mcp.json') },
+    { name: 'VSCode Insiders GitHub Copilot', file: path.join(getAppDataDir(), 'Code - Insiders', 'User', 'globalStorage', 'github.copilot', 'mcp.json') },
+    { name: 'Windsurf', file: path.join(getUserProfilePath(), '.codeium', 'windsurf', 'mcp_config.json') },
+    { name: 'Zed', file: path.join(getUserProfilePath(), '.config', 'zed', 'mcp.json') }
 ];
 
 export function scanMcpClients() {
