@@ -4,6 +4,10 @@
 
 ---
 
+## [Unreleased]
+### Added
+- **Preview Resolution Options**: Added 32+ new comprehensive device resolution presets encompassing iOS/iPadOS flagships, standard Android phones, multi-form foldables, and tablets to support thorough UI boundary tests.
+
 ## [0.1.0] - 2026-04-04
 
 ### ✨ 新特性

@@ -309,10 +309,41 @@
                 <select v-model="selectedResolution" class="truncate-text"
                     style="background:#555; color:#fff; border:1px solid #777; padding:3px; outline:none; border-radius:3px; flex: 1;">
                     <option value="FIT">自动充满 (Fit Window)</option>
-                    <option value="750x1334">iPhone 7 (750x1334)</option>
-                    <option value="1125x2436">iPhone X (1125x2436)</option>
-                    <option value="1080x1920">Android 1080p (1080x1920)</option>
-                    <option value="1284x2778">iPhone 12 Pro Max (1284x2778)</option>
+                    <optgroup label="iOS/iPadOS 阵营">
+                        <option value="1290x2796">iPhone 16 Pro Max/15 Pro Max (2796x1290)</option>
+                        <option value="1206x2622">iPhone 16 Pro (2622x1206)</option>
+                        <option value="1284x2778">iPhone 16 Plus/12 Pro Max (2778x1284)</option>
+                        <option value="1170x2532">iPhone 14/13 (2532x1170)</option>
+                        <option value="750x1334">iPhone 7/SE (1334x750)</option>
+                        <option value="2048x2732">iPad Pro 12.9" (2732x2048)</option>
+                        <option value="1488x2266">iPad mini 7 (2266x1488)</option>
+                    </optgroup>
+                    <optgroup label="安卓直板手机">
+                        <option value="1440x3176">华为Mate 70 Pro+ (3176x1440)</option>
+                        <option value="1440x3088">三星Galaxy S24 Ultra (3088x1440)</option>
+                        <option value="1440x3200">主流2K旗舰标杆 (3200x1440)</option>
+                        <option value="1080x2340">三星Galaxy S24/A55 (2340x1080)</option>
+                        <option value="1644x3840">索尼Xperia 1 VI 全屏 (3840x1644)</option>
+                        <option value="1440x3120">中兴Axon 60 Ultra/全面屏 (3120x1440)</option>
+                        <option value="1240x2772">主流1.5K中端标杆 (2772x1240)</option>
+                        <option value="720x1600">入门机基准下限测试 (1600x720)</option>
+                    </optgroup>
+                    <optgroup label="折叠屏全形态">
+                        <option value="1080x2440">华为Mate X6 (外屏 2440x1080)</option>
+                        <option value="2230x2460">华为Mate X6 (内屏 2460x2230)</option>
+                        <option value="904x2316">三星Z Fold6 (外屏 2316x904)</option>
+                        <option value="2160x2592">三星Z Fold6 (内屏 2592x2160)</option>
+                        <option value="2200x2480">华为Mate Xs 2 (外折单屏 2480x2200)</option>
+                        <option value="1080x2640">三星Z Flip6/竖折 (内屏 2640x1080)</option>
+                        <option value="2700x3120">华为Mate XT (三折展开 3120x2700)</option>
+                    </optgroup>
+                    <optgroup label="平板游戏横态">
+                        <option value="1840x2880">华为MatePad Pro 13.2" (2880x1840)</option>
+                        <option value="1848x3088">三星Tab S10 Ultra (3088x1848)</option>
+                        <option value="1440x2560">联想Y700 游戏专属平板 (2560x1440)</option>
+                        <option value="1200x2000">联想小新Pad/主销级 (2000x1200)</option>
+                        <option value="1200x1920">亚马逊Fire HD 10/出海基准 (1920x1200)</option>
+                    </optgroup>
                 </select>
                 <button class="icon-btn" title="横竖屏切换" @click="rotateScreen">🔄</button>
             </div>
