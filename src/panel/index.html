@@ -449,15 +449,202 @@
             </div>
 
             <!-- Tab 2/3: 辅助页 -->
-            <div v-show="activeTab === 2" style="position: absolute; inset: 0; padding: 15px;">
-                <h4>Cocos 运行环境</h4>
-                <div v-if="!globalState.cocosInfo" style="font-size: 12px; color:#aaa;">等待握手...</div>
-                <ul v-else style="font-size: 13px; color: #bbb;">
-                    <li>Cocos 版本: {{ globalState.cocosInfo.version }}</li>
-                    <li>原生环境: {{ globalState.cocosInfo.isNative }}</li>
-                    <li>移动设备: {{ globalState.cocosInfo.isMobile }}</li>
-                    <li>语言模式: {{ globalState.cocosInfo.language }}</li>
-                </ul>
+            <div v-show="activeTab === 2" style="position: absolute; inset: 0; padding: 25px; overflow-y: auto; background: #1a1a1a;">
+                <h2 style="margin: 0 0 8px 0; color: #fff; font-size: calc(var(--base-font-size, 13px) + 9px);">Cocos 引擎运行环境调试面板</h2>
+                <div style="color: #aaa; margin-bottom: 25px; font-size: calc(var(--base-font-size, 13px) - 1px);">实时展示引擎核心系统运行参数与状态</div>
+                
+                <div v-if="!globalState.cocosInfo" style="font-size: var(--base-font-size, 13px); color:#aaa;">等待握手...</div>
+                
+                <div v-else style="display: flex; flex-direction: column; gap: 15px;">
+                    <!-- 基础运行环境 -->
+                    <details open style="background: #222; border-radius: 6px; padding: 15px; border: 1px solid #333;">
+                        <summary style="cursor: pointer; color: #4caf50; font-size: calc(var(--base-font-size, 13px) + 2px); font-weight: bold; outline: none; margin-bottom: 15px;">基础运行环境</summary>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-left: 10px;">
+                            <div>
+                                <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">Cocos 版本</div>
+                                <div style="color: #eee; font-size: var(--base-font-size, 13px);">{{ globalState.cocosInfo.version }}</div>
+                            </div>
+                            <div>
+                                <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">语言模式</div>
+                                <div style="color: #eee; font-size: var(--base-font-size, 13px);">{{ globalState.cocosInfo.language }}</div>
+                            </div>
+                            <div>
+                                <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">原生环境</div>
+                                <div :style="{display:'inline-block', padding:'2px 6px', borderRadius:'4px', fontSize:'calc(var(--base-font-size, 13px) - 3px)', background: globalState.cocosInfo.isNative ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)', color: globalState.cocosInfo.isNative ? '#4caf50' : '#f44336'}">{{ globalState.cocosInfo.isNative }}</div>
+                            </div>
+                            <div>
+                                <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">移动设备</div>
+                                <div :style="{display:'inline-block', padding:'2px 6px', borderRadius:'4px', fontSize:'calc(var(--base-font-size, 13px) - 3px)', background: globalState.cocosInfo.isMobile ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)', color: globalState.cocosInfo.isMobile ? '#4caf50' : '#f44336'}">{{ globalState.cocosInfo.isMobile }}</div>
+                            </div>
+                        </div>
+                    </details>
+          
+                    <!-- 静态子系统状态 -->
+                    <details open v-if="globalState.cocosInfo.downloader || globalState.cocosInfo.dynamicAtlas" style="background: #222; border-radius: 6px; padding: 15px; border: 1px solid #333;">
+                        <summary style="cursor: pointer; color: #2196f3; font-size: calc(var(--base-font-size, 13px) + 2px); font-weight: bold; outline: none; margin-bottom: 15px;">静态子系统状态</summary>
+                        
+                        <div v-if="globalState.cocosInfo.dynamicAtlas" style="margin-left: 10px; margin-bottom: 20px;">
+                            <div style="color: #e0e0e0; font-size: var(--base-font-size, 13px); margin-bottom: 10px;">[图集] 配置参数</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1.5fr 1.5fr 1fr 1fr; gap: 15px;">
+                                <div>
+                                    <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">动态图集引擎</div>
+                                    <div :style="{display:'inline-block', padding:'2px 6px', borderRadius:'4px', fontSize:'calc(var(--base-font-size, 13px) - 3px)', background: globalState.cocosInfo.dynamicAtlas.enabled ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)', color: globalState.cocosInfo.dynamicAtlas.enabled ? '#4caf50' : '#f44336'}">{{ globalState.cocosInfo.dynamicAtlas.enabled }}</div>
+                                </div>
+                                <template v-if="globalState.cocosInfo.dynamicAtlas.enabled">
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">图集使用量</div>
+                                        <div style="color: #eee; font-size: var(--base-font-size, 13px);">
+                                            <span style="color: #4caf50; font-weight: bold;">{{ globalState.cocosInfo.dynamicAtlas.atlasCount }}</span>
+                                            <span style="color: #666; margin: 0 4px;">/</span>
+                                            <span>{{ globalState.cocosInfo.dynamicAtlas.maxAtlasCount }}</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">碎图装箱限制</div>
+                                        <div style="color: #eee; font-size: var(--base-font-size, 13px);">{{ globalState.cocosInfo.dynamicAtlas.minFrameSize }}px ~ {{ globalState.cocosInfo.dynamicAtlas.maxFrameSize }}px</div>
+                                    </div>
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">生成网格大小</div>
+                                        <div style="color: #eee; font-size: var(--base-font-size, 13px);">{{ globalState.cocosInfo.dynamicAtlas.textureSize }}x{{ globalState.cocosInfo.dynamicAtlas.textureSize }}</div>
+                                    </div>
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">纹理扩边</div>
+                                        <div :style="{display:'inline-block', padding:'2px 6px', borderRadius:'4px', fontSize:'calc(var(--base-font-size, 13px) - 3px)', background: globalState.cocosInfo.dynamicAtlas.textureBleeding ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)', color: globalState.cocosInfo.dynamicAtlas.textureBleeding ? '#4caf50' : '#f44336'}">{{ globalState.cocosInfo.dynamicAtlas.textureBleeding }}</div>
+                                    </div>
+                                </template>
+                                <template v-else>
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">图集使用量</div>
+                                        <div style="color: #555; font-size: var(--base-font-size, 13px);">未配置</div>
+                                    </div>
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">碎图装箱限制</div>
+                                        <div style="color: #555; font-size: var(--base-font-size, 13px);">未配置</div>
+                                    </div>
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">生成网格大小</div>
+                                        <div style="color: #555; font-size: var(--base-font-size, 13px);">未配置</div>
+                                    </div>
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">纹理扩边</div>
+                                        <div style="color: #555; font-size: var(--base-font-size, 13px);">未配置</div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <div v-if="globalState.cocosInfo.downloader" style="margin-left: 10px;">
+                            <div style="color: #e0e0e0; font-size: var(--base-font-size, 13px); margin-bottom: 10px;">[网络] 下载器配置</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                                <div>
+                                    <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">下载器并发数</div>
+                                    <div style="color: #eee; font-size: var(--base-font-size, 13px);">{{ globalState.cocosInfo.downloader.maxConcurrency }}</div>
+                                </div>
+                                <div>
+                                    <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">单帧最大请求数</div>
+                                    <div style="color: #eee; font-size: var(--base-font-size, 13px);">{{ globalState.cocosInfo.downloader.maxRequestsPerFrame }}</div>
+                                </div>
+                                <div>
+                                    <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">失败重试延迟</div>
+                                    <div style="color: #eee; font-size: var(--base-font-size, 13px);">{{ globalState.cocosInfo.downloader.retryInterval }}ms <span style="color:#666; font-size:calc(var(--base-font-size, 13px) - 2px)">(重试 {{ globalState.cocosInfo.downloader.retryCount }} 次)</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+          
+                    <!-- 物理与碰撞系统 -->
+                    <details open v-if="globalState.cocosInfo.physics || globalState.cocosInfo.collision" style="background: #222; border-radius: 6px; padding: 15px; border: 1px solid #333;">
+                        <summary style="cursor: pointer; color: #f44336; font-size: calc(var(--base-font-size, 13px) + 2px); font-weight: bold; outline: none; margin-bottom: 15px;">物理与碰撞系统</summary>
+                        
+                        <div v-if="globalState.cocosInfo.physics" style="margin-left: 10px; margin-bottom: 20px;">
+                            <div style="color: #e0e0e0; font-size: var(--base-font-size, 13px); margin-bottom: 10px;">[2D物理] 配置参数</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1.5fr 1fr 1fr 1fr; gap: 15px;">
+                                <div>
+                                    <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">启用状态</div>
+                                    <div :style="{display:'inline-block', padding:'2px 6px', borderRadius:'4px', fontSize:'calc(var(--base-font-size, 13px) - 3px)', background: globalState.cocosInfo.physics.enabled ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)', color: globalState.cocosInfo.physics.enabled ? '#4caf50' : '#f44336'}">{{ globalState.cocosInfo.physics.enabled }}</div>
+                                </div>
+                                <template v-if="globalState.cocosInfo.physics.enabled">
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">重力</div>
+                                        <div style="font-family: monospace; font-size: var(--base-font-size, 13px); color: #eee;">({{ globalState.cocosInfo.physics.gravity }})</div>
+                                    </div>
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">开启休眠</div>
+                                        <div :style="{display:'inline-block', padding:'2px 6px', borderRadius:'4px', fontSize:'calc(var(--base-font-size, 13px) - 3px)', background: globalState.cocosInfo.physics.allowSleep ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)', color: globalState.cocosInfo.physics.allowSleep ? '#4caf50' : '#f44336'}">{{ globalState.cocosInfo.physics.allowSleep }}</div>
+                                    </div>
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">物理步长</div>
+                                        <div style="color: #eee; font-size: var(--base-font-size, 13px);">{{ globalState.cocosInfo.physics.fixedTimeStep }}</div>
+                                    </div>
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">最大子步</div>
+                                        <div style="color: #eee; font-size: var(--base-font-size, 13px);">{{ globalState.cocosInfo.physics.maxSubSteps }}</div>
+                                    </div>
+                                </template>
+                                <template v-else>
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">重力</div>
+                                        <div style="color: #555; font-size: var(--base-font-size, 13px);">未配置</div>
+                                    </div>
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">开启休眠</div>
+                                        <div style="color: #555; font-size: var(--base-font-size, 13px);">未配置</div>
+                                    </div>
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">物理步长</div>
+                                        <div style="color: #555; font-size: var(--base-font-size, 13px);">未配置</div>
+                                    </div>
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">最大子步</div>
+                                        <div style="color: #555; font-size: var(--base-font-size, 13px);">未配置</div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <!-- 物理系统调试绘制标记 -->
+                            <div v-if="globalState.cocosInfo.physics.enabled" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #444;">
+                                <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 8px;">调试绘图标记位 (debugDrawFlags: {{ globalState.cocosInfo.physics.drawFlags ? globalState.cocosInfo.physics.drawFlags.raw : 0 }})</div>
+                                <div v-if="globalState.cocosInfo.physics.drawFlags" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    <div :style="{display:'inline-block', padding:'2px 8px', borderRadius:'4px', fontSize:'calc(var(--base-font-size, 13px) - 3px)', background: globalState.cocosInfo.physics.drawFlags.aabb ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)', color: globalState.cocosInfo.physics.drawFlags.aabb ? '#4caf50' : '#f44336'}">包围盒 (AABB)</div>
+                                    <div :style="{display:'inline-block', padding:'2px 8px', borderRadius:'4px', fontSize:'calc(var(--base-font-size, 13px) - 3px)', background: globalState.cocosInfo.physics.drawFlags.pair ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)', color: globalState.cocosInfo.physics.drawFlags.pair ? '#4caf50' : '#f44336'}">碰撞对 (Pair)</div>
+                                    <div :style="{display:'inline-block', padding:'2px 8px', borderRadius:'4px', fontSize:'calc(var(--base-font-size, 13px) - 3px)', background: globalState.cocosInfo.physics.drawFlags.centerOfMass ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)', color: globalState.cocosInfo.physics.drawFlags.centerOfMass ? '#4caf50' : '#f44336'}">质心 (CenterOfMass)</div>
+                                    <div :style="{display:'inline-block', padding:'2px 8px', borderRadius:'4px', fontSize:'calc(var(--base-font-size, 13px) - 3px)', background: globalState.cocosInfo.physics.drawFlags.joint ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)', color: globalState.cocosInfo.physics.drawFlags.joint ? '#4caf50' : '#f44336'}">关节 (Joint)</div>
+                                    <div :style="{display:'inline-block', padding:'2px 8px', borderRadius:'4px', fontSize:'calc(var(--base-font-size, 13px) - 3px)', background: globalState.cocosInfo.physics.drawFlags.shape ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)', color: globalState.cocosInfo.physics.drawFlags.shape ? '#4caf50' : '#f44336'}">形状 (Shape)</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-if="globalState.cocosInfo.collision" style="margin-left: 10px;">
+                            <div style="color: #e0e0e0; font-size: var(--base-font-size, 13px); margin-bottom: 10px;">[碰撞器] 配置参数</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                                <div>
+                                    <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">启用状态</div>
+                                    <div :style="{display:'inline-block', padding:'2px 6px', borderRadius:'4px', fontSize:'calc(var(--base-font-size, 13px) - 3px)', background: globalState.cocosInfo.collision.enabled ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)', color: globalState.cocosInfo.collision.enabled ? '#4caf50' : '#f44336'}">{{ globalState.cocosInfo.collision.enabled }}</div>
+                                </div>
+                                <template v-if="globalState.cocosInfo.collision.enabled">
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">绘制外框包围盒</div>
+                                        <div :style="{display:'inline-block', padding:'2px 6px', borderRadius:'4px', fontSize:'calc(var(--base-font-size, 13px) - 3px)', background: globalState.cocosInfo.collision.drawBoundingBox ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)', color: globalState.cocosInfo.collision.drawBoundingBox ? '#4caf50' : '#f44336'}">{{ globalState.cocosInfo.collision.drawBoundingBox }}</div>
+                                    </div>
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">调试绘图模式</div>
+                                        <div :style="{display:'inline-block', padding:'2px 6px', borderRadius:'4px', fontSize:'calc(var(--base-font-size, 13px) - 3px)', background: globalState.cocosInfo.collision.debugDraw ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)', color: globalState.cocosInfo.collision.debugDraw ? '#4caf50' : '#f44336'}">{{ globalState.cocosInfo.collision.debugDraw }}</div>
+                                    </div>
+                                </template>
+                                <template v-else>
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">绘制外框包围盒</div>
+                                        <div style="color: #555; font-size: var(--base-font-size, 13px);">未配置</div>
+                                    </div>
+                                    <div>
+                                        <div style="color: #888; font-size: calc(var(--base-font-size, 13px) - 2px); margin-bottom: 6px;">调试绘图模式</div>
+                                        <div style="color: #555; font-size: var(--base-font-size, 13px);">未配置</div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </details>
+                </div>
             </div>
             <div v-show="activeTab === 3" style="position: absolute; inset: 0; padding: 15px;">
                 <h4>第三方扩展</h4>

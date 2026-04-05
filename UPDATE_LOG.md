@@ -6,6 +6,7 @@
 
 ## [Unreleased]
 ### Added
+- **Global Info Categorization**: Enhanced the 'Cocos Environment' tab to support dynamically categorized global metrics with `<details>` accordions. Captures exhaustive context including Downloader settings, Dynamic Atlas parameters, 2D Physics metrics, and Collision system configurations.
 - **Preview Resolution Options**: Added 32+ new comprehensive device resolution presets encompassing iOS/iPadOS flagships, standard Android phones, multi-form foldables, and tablets to support thorough UI boundary tests.
 
 ## [0.1.0] - 2026-04-04
@@ -21,6 +22,10 @@
   - 新增工具 `get_runtime_stats` 以配合性能面板监测当前游戏的帧率、渲染耗时和并发的 DrawCall。
 
 ### 🐛 缺陷修复
+
+- **修复高级版 Electron 引起的 IPC 克隆崩溃与探针初始化挂起假死 (IPC Structured Clone Exception Fix)**
+  - **问题**：新版 Electron 的 IPC `sendToHost` 强制基于安全对象结构化克隆 (`structuredClone`)，在收到探针上传的不纯洁对象（包含函数闭包或原生引用，如 `cc.assetManager.downloader` 等全局属性）时，在执行期间直接引发异常被阻断。致使初始化后续轮询逻辑完全腰斩，只有在超时告警后 `Fallback` 退化机制登场才能拉得取到场景树。
+  - **方案**：改由 Webview 直接通过安全的 `JSON.stringify` 在沙盒内侧字符串化抹掉函数，主进程接收后按需 `JSON.parse` 还原。
 
 - **修复部分魔改高版本 Electron 下 `remote` 未定义导致的白屏崩溃 (Electron 14+ remote polyfill/fallback)**
   - **问题**：在部分已经将引擎内置 Electron 升级到 v14 以上（如 16.5.0 原生去除了 remote 模块）的环境下，对 `electron.remote` 的解构直接导致 DevTools 初始化异常阻塞甚至面板渲染致命白屏崩溃。

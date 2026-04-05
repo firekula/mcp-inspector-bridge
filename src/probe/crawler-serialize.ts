@@ -6,8 +6,15 @@ export function syncNodeTree() {
     const treeData = serializeNode(scene, 0);
     const pauseStatus = (typeof window.cc.game !== 'undefined' && window.cc.game.isPaused) ? window.cc.game.isPaused() : false;
     
+    let atlasCount = undefined;
+    try {
+        if (window.cc && window.cc.dynamicAtlasManager) {
+            atlasCount = window.cc.dynamicAtlasManager.atlasCount;
+        }
+    } catch(e) {}
+
     if (window.__mcpInspector && window.__mcpInspector.updateTree) {
-        window.__mcpInspector.updateTree(JSON.stringify({ tree: treeData, isPaused: pauseStatus }));
+        window.__mcpInspector.updateTree(JSON.stringify({ tree: treeData, isPaused: pauseStatus, atlasCount: atlasCount }));
     }
 }
 

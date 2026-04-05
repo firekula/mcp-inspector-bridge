@@ -114,6 +114,23 @@ module.exports = Editor.Panel.extend({
                     } catch(e) {}
                 });
 
+                watch(activeTab, (newVal: number) => {
+                    try {
+                        const wv: any = gameView.value;
+                        if (wv && typeof wv.executeJavaScript === 'function') {
+                            wv.executeJavaScript(`
+                                window.__mcpActiveTab = ${newVal};
+                                if(${newVal} === 0 && window.__mcpProbeInitialized && typeof window.__mcpSyncNodeTree === 'function') {
+                                    window.__mcpSyncNodeTree();
+                                }
+                                if(${newVal} === 2 && window.__mcpProbeInitialized && typeof window.__mcpGetEnvInfo === 'function') {
+                                    if (window.__mcpInspector && window.__mcpInspector.updateEnv) window.__mcpInspector.updateEnv(window.__mcpGetEnvInfo());
+                                }
+                            `).catch((e:any)=>{});
+                        }
+                    } catch (e) {}
+                });
+
                 onMounted(() => {
                     layoutSystem.setupResizeObserver();
                     gameViewSystem.setupGameViewListeners();

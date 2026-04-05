@@ -248,6 +248,9 @@ export function useGameView(
                                 if (scene) {
                                     var isP = (eng.game && typeof eng.game.isPaused === 'function') ? eng.game.isPaused() : false;
                                     var result = { tree: serializeNode(scene, 0), version: eng.ENGINE_VERSION, isPaused: isP };
+                                    if (typeof window.__mcpGetEnvInfo !== 'undefined') {
+                                        result.env = window.__mcpGetEnvInfo();
+                                    }
                                     return JSON.stringify(result);
                                 }
                             }
@@ -267,6 +270,17 @@ export function useGameView(
                                 globalState.nodeTree = parsed.tree;
                                 if (parsed.isPaused !== undefined) {
                                     globalState.isGamePaused = !!parsed.isPaused;
+                                }
+                                if (parsed.env && globalState.cocosInfo) {
+                                    globalState.cocosInfo.downloader = parsed.env.downloader;
+                                    globalState.cocosInfo.dynamicAtlas = parsed.env.dynamicAtlas;
+                                    globalState.cocosInfo.physics = parsed.env.physics;
+                                    globalState.cocosInfo.collision = parsed.env.collision;
+                                    
+                                    // 保证向下兼容的 fallback
+                                    if (parsed.env.dynamicAtlas && parsed.env.dynamicAtlas.atlasCount !== undefined) {
+                                        globalState.cocosInfo.dynamicAtlas.atlasCount = parsed.env.dynamicAtlas.atlasCount;
+                                    }
                                 }
                                 if (parsed.version && !globalState.cocosInfo) {
                                     globalState.cocosInfo = { version: parsed.version, isNative: false, isMobile: false, language: 'unknown (fallback)' };
@@ -336,7 +350,11 @@ export function useGameView(
         if (gameViewDynamic) {
             gameViewDynamic.addEventListener('ipc-message', (event: any) => {
                 if (event.channel === 'handshake') {
-                    globalState.cocosInfo = event.args[0];
+                    try {
+                        globalState.cocosInfo = typeof event.args[0] === 'string' ? JSON.parse(event.args[0]) : event.args[0];
+                    } catch (e) {
+                        globalState.cocosInfo = event.args[0];
+                    }
                     setTimeout(() => {
                         executeMacro(isShowFPS.value ? 'fps:true' : 'fps:false');
                         executeMacro(isAudioMuted.value ? 'mute:true' : 'mute:false');
@@ -354,6 +372,16 @@ export function useGameView(
                         globalState.lastTreeUpdate = Date.now();
                         // Removed disruptive onNodeSelectFallback that causes erratic Vue selection bouncing
                     } catch (e) { }
+                } else if (event.channel === 'update-env') {
+                    try {
+                        const parsed = event.args && typeof event.args[0] === 'string' ? JSON.parse(event.args[0]) : event.args[0];
+                        if (parsed && globalState.cocosInfo) {
+                            globalState.cocosInfo.downloader = parsed.downloader;
+                            globalState.cocosInfo.dynamicAtlas = parsed.dynamicAtlas;
+                            globalState.cocosInfo.physics = parsed.physics;
+                            globalState.cocosInfo.collision = parsed.collision;
+                        }
+                    } catch(e) {}
                 } else if (event.channel === 'render-debugger-payload') {
                     try {
                         const payload = event.args[0];

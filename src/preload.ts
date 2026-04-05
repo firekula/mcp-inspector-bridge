@@ -79,6 +79,9 @@ window.addEventListener('DOMContentLoaded', () => {
         updateTree: (treeData: string) => {
             ipcRenderer.sendToHost('update-tree', treeData);
         },
+        updateEnv: (envData: any) => {
+            ipcRenderer.sendToHost('update-env', envData);
+        },
         sendLog: (logData: string) => {
             ipcRenderer.sendToHost('send-log', logData);
         },
@@ -123,6 +126,7 @@ window.addEventListener('DOMContentLoaded', () => {
                         if (window.__mcpInspector) return; // 已有，跳过
                         window.__mcpInspector = {
                             updateTree: function(data) { window.parent.postMessage({ __mcp_ipc_proxy: true, channel: 'update-tree', args: [data] }, '*'); },
+                            updateEnv: function(data) { window.parent.postMessage({ __mcp_ipc_proxy: true, channel: 'update-env', args: [data] }, '*'); },
                             sendLog: function(data) { window.parent.postMessage({ __mcp_ipc_proxy: true, channel: 'send-log', args: [data] }, '*'); },
                             sendHandshake: function(info) { window.parent.postMessage({ __mcp_ipc_proxy: true, channel: 'handshake', args: [info] }, '*'); },
                             sendRenderDebuggerPayload: function(payload) { window.parent.postMessage({ __mcp_ipc_proxy: true, channel: 'render-debugger-payload', args: [payload] }, '*'); },
