@@ -51,10 +51,68 @@ export function useNodeSystem(globalState: any, gameView: any, nodeTreeRef: any,
             wv.executeJavaScript(code).then((res: string) => {
                 if (res) {
                     const newObj = JSON.parse(res);
-                    if (isAutoRefresh && globalState.nodeDetail && globalState.nodeDetail.id === newObj.id) {
-                        syncNodeDetail(globalState.nodeDetail, newObj);
+                    const updateState = (finalObj: any) => {
+                        if (isAutoRefresh && globalState.nodeDetail && globalState.nodeDetail.id === finalObj.id) {
+                            syncNodeDetail(globalState.nodeDetail, finalObj);
+                        } else {
+                            globalState.nodeDetail = Object.assign({}, finalObj);
+                        }
+                    };
+
+                    if (!newObj.prefabUuid && typeof Editor !== 'undefined' && Editor.Ipc) {
+                        try {
+                            Editor.Ipc.sendToPanel('scene', 'scene:query-node', node.id, (err: any, dumpObj: any) => {
+                                console.log('[Editor Fallback] scene:query-node result for ' + node.id, { err, dumpObj });
+                                if (!err && dumpObj) {
+                                    try {
+                                        const parsedDump = typeof dumpObj === 'string' ? JSON.parse(dumpObj) : dumpObj;
+                                        const v = parsedDump.value || parsedDump;
+                                        
+                                        // A reliable deep search function to locate the asset uuid within the prefab structure
+                                        const findUuid = (obj: any, depth = 0): string | null => {
+                                            if (!obj || typeof obj !== 'object' || depth > 6) return null;
+                                            
+                                            // 预制体引用通常存在 asset 节点下，提取其中的 uuid 值 (同时规避提取到当前节点的自身 uuid 或者是 fileId)
+                                            if (obj.uuid && typeof obj.uuid === 'string' && obj.uuid.length > 10 && obj.uuid.indexOf('-') !== -1 && obj.uuid !== node.id) {
+                                                return obj.uuid;
+                                            }
+                                            if (obj._uuid && typeof obj._uuid === 'string' && obj._uuid.length > 10 && obj._uuid.indexOf('-') !== -1 && obj._uuid !== node.id) {
+                                                return obj._uuid;
+                                            }
+                                            
+                                            // 遍历对象，特别是我们要往 .value, .asset 等深入
+                                            for (let key in obj) {
+                                                if (key === 'fileId' || key === 'root' || key === 'sync') continue; // 跳过不相关的
+                                                const res = findUuid(obj[key], depth + 1);
+                                                if (res) return res;
+                                            }
+                                            return null;
+                                        };
+
+                                        // Start looking in the prefab property of the node dump
+                                        const prefabDump = v.__prefab__ || (v.prefab && v.prefab.value) || v._prefab;
+                                        if (prefabDump) {
+                                            const foundId = findUuid(prefabDump);
+                                            if (foundId) {
+                                                newObj.prefabUuid = foundId;
+                                                console.log('[Editor Fallback] Successfully located true prefabUuid:', foundId);
+                                            } else {
+                                                console.warn('[Editor Fallback] Could not find a valid UUID inside the prefab dump object!', prefabDump);
+                                            }
+                                        }
+
+                                    } catch (e) {
+                                        console.error('[Editor Fallback] Error parsing dump:', e);
+                                    }
+                                }
+                                updateState(newObj);
+                            });
+                        } catch (e) {
+                            console.error('[Editor Fallback] sendToPanel error:', e);
+                            updateState(newObj);
+                        }
                     } else {
-                        globalState.nodeDetail = newObj;
+                        updateState(newObj);
                     }
                 } else {
                     if (!isAutoRefresh) globalState.nodeDetail = null;

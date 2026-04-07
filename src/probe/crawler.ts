@@ -35,10 +35,28 @@ export function initCrawler() {
 
             let prefabUuid = null;
             try {
-                if (node._prefab && node._prefab.asset) {
-                    prefabUuid = node._prefab.asset._uuid || node._prefab.asset.uuid || node._prefab.asset.id;
+                if (node._prefab) {
+                    if (node._prefab.asset) {
+                        prefabUuid = node._prefab.asset._uuid || node._prefab.asset.uuid || node._prefab.asset.id;
+                    }
+                    if (!prefabUuid && node._prefab.fileId) {
+                        prefabUuid = node._prefab.fileId;
+                    }
+                    if (!prefabUuid && node._prefab._prefab) {
+                        prefabUuid = node._prefab._prefab._uuid || node._prefab._prefab.uuid;
+                    }
+                    if (!prefabUuid) {
+                        var cur = node;
+                        while (cur) {
+                            if (cur._prefab && cur._prefab.root === cur && cur._prefab.asset) {
+                                prefabUuid = cur._prefab.asset._uuid || cur._prefab.asset.uuid || cur._prefab.asset.id;
+                                break;
+                            }
+                            cur = cur.parent;
+                        }
+                    }
                 }
-            } catch(e) {}
+            } catch (e) {}
 
             let sx = 1, sy = 1;
             if ('scale' in node && typeof node.scale === 'object' && 'x' in node.scale) {
