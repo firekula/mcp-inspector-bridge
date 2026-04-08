@@ -111,6 +111,41 @@ export function startMcpRouter(port: number): { wss: WebSocket.Server, status: a
                             return;
                         }
 
+                        // ★ get_runtime_logs 优先走主进程 CDP 数据源（零侵入，无需面板 IPC 中转）
+                        if (name === 'get_runtime_logs') {
+                            try {
+                                const directRes = await new Promise<any>((resolve, reject) => {
+                                    const timer = setTimeout(() => reject(new Error('CDP 日志查询超时')), 3500);
+                                    Editor.Ipc.sendToMain(
+                                        'mcp-inspector-bridge:query-cdp-logs',
+                                        args,
+                                        (err: any, data: any) => { clearTimeout(timer); err ? reject(err) : resolve(data); },
+                                        4000
+                                    );
+                                });
+
+                                const contentText = JSON.stringify(directRes.result || directRes, null, 2);
+                                // ★ 当日志为空时附加诊断信息
+                                let finalContent = contentText;
+                                if (directRes._debug && (!directRes.result || directRes.result.length === 0)) {
+                                    finalContent = JSON.stringify({
+                                        logs: directRes.result,
+                                        _debug: directRes._debug,
+                                        _hint: 'attached=false 表示未找到预览页面或 debugger attach 失败',
+                                    }, null, 2);
+                                }
+                                ws.send(JSON.stringify({ jsonrpc: "2.0", id: reqId, result: { content: [{ type: "text", text: finalContent }] } }));
+                                return; // 已处理，不再走面板 IPC
+                            } catch (err: any) {
+                                // CDP 查询失败时返回错误信息
+                                ws.send(JSON.stringify({
+                                    jsonrpc: "2.0", id: reqId,
+                                    result: { content: [{ type: "text", text: `CDP 日志不可用: ${err.message}` }], isError: true }
+                                }));
+                                return;
+                            }
+                        }
+
                         // Check cache for specific frequent queries
                         const cacheKey = `${name}_${JSON.stringify(args)}`;
                         if (name === 'get_node_tree' && CACHE[cacheKey] && Date.now() - CACHE[cacheKey].timestamp < 500) {

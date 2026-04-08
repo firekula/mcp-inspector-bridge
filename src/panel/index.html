@@ -615,6 +615,15 @@
                         style="margin-top: 8px; padding: 4px 12px; background: #1976d2; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">🔧
                         在独立窗口中打开 DevTools</button>
                 </div>
+                
+                <!-- 提示：控制台日志原始位置恢复指引 -->
+                <div v-if="!globalState.devToolsError"
+                    style="padding: 6px 15px; background: #2a2a2a; border-bottom: 1px solid #111; display: flex; justify-content: space-between; align-items: center;">
+                    <div class="mcp-log-hint" style="opacity: 0.8; font-size: 11px; color: #aaa;">
+                        💡 日志来源若显示为 mcp-log-capture.js，请在下方 DevTools -> ⚙️ Settings -> Ignore List 添加该名称排除。
+                    </div>
+                </div>
+
                 <!-- Phase 7: BrowserView 占位 div，BrowserView 将覆盖此区域 -->
                 <div ref="devtoolsView"
                     style="width: 100%; flex: 1; background: #242424; display: flex; align-items: center; justify-content: center; color: #666; font-size: 13px;">

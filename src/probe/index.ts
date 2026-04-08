@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { Logger } from './logger';
-import { initConsoleHijacker } from './console-hijacker';
+// import { initConsoleHijacker } from './console-hijacker'; // 已废弃：日志由主进程 CDP listener 接管
 import { initCrawler, syncNodeTree } from './crawler';
 import { initHighlighter, startHighlighterHook } from './highlighter';
 import { initProfiler } from './profiler';
@@ -15,7 +15,7 @@ import { initPicker } from './picker';
     }
 
     // 初始化全局模块暴露区
-    initConsoleHijacker();
+    // initConsoleHijacker(); // 已废弃：日志由主进程 CDP listener 接管
     initCrawler();
     initHighlighter();
     initProfiler();
