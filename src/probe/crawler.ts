@@ -2,6 +2,58 @@
 import { Logger } from './logger';
 import { syncNodeTree } from './crawler-serialize';
 
+function initVisualFeedbackStyle() {
+    if (document.getElementById('__mcp_simulate_style')) return;
+    const style = document.createElement('style');
+    style.id = '__mcp_simulate_style';
+    style.textContent = `
+    .mcp-visual-base {
+        position: fixed;
+        pointer-events: none;
+        z-index: 2147483647;
+        transform: translate(-50%, -50%);
+    }
+    .mcp-visual-click {
+        width: 20px; height: 20px;
+        border: 2px solid rgba(255, 0, 0, 0.8);
+        border-radius: 50%;
+        animation: mcp-ripple 0.5s ease-out forwards;
+    }
+    .mcp-visual-click::after, .mcp-visual-click::before {
+        content: ""; position: absolute; background: rgba(255, 0, 0, 0.8);
+    }
+    .mcp-visual-click::before { top: 50%; left: -5px; right: -5px; height: 1px; }
+    .mcp-visual-click::after { left: 50%; top: -5px; bottom: -5px; width: 1px; }
+    
+    .mcp-visual-long-press {
+        width: 40px; height: 40px;
+        border-radius: 50%;
+        border: 4px solid rgba(255, 165, 0, 0.3);
+        border-top-color: rgba(255, 165, 0, 1);
+        animation: mcp-spin linear forwards;
+    }
+    .mcp-visual-swipe {
+        width: 16px; height: 16px;
+        background-color: rgba(0, 150, 255, 0.8);
+        border-radius: 50%;
+        box-shadow: 0 0 8px rgba(0, 150, 255, 1);
+    }
+    @keyframes mcp-ripple {
+        0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+        100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
+    }
+    @keyframes mcp-spin {
+        0% { transform: translate(-50%, -50%) rotate(0deg); }
+        100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+    `;
+    if (document.head) {
+        document.head.appendChild(style);
+    } else {
+        document.body.appendChild(style);
+    }
+}
+
 export function initCrawler() {
     window.__mcpCrawler = {
         findNodeByUuid: function (uuid, root) {
@@ -429,24 +481,32 @@ export function initCrawler() {
             const eng = window.cc;
             if (!eng || !eng.director) return { error: 'ENGINE_NOT_READY' };
 
-            let worldPos = eng.v2(0, 0);
+            let screenPt = eng.v2(0, 0);
+            let targetSource = '';
+
             if (args && args.uuid) {
                 const node = this.findNodeByUuid(args.uuid);
                 if (!node || !node.isValid) return { error: 'NODE_NOT_FOUND', msg: 'Node not found or destroyed.' };
+                let worldPos = eng.v2(0, 0);
                 if (typeof node.convertToWorldSpaceAR === 'function') {
                     worldPos = node.convertToWorldSpaceAR(eng.v2(0, 0));
                 }
+                
+                let camera = null;
+                if (eng.Camera && eng.Camera.cameras) {
+                    camera = eng.Camera.cameras.sort(function(a, b){ return b.depth - a.depth; })[0];
+                }
+                screenPt = (camera && typeof camera.getWorldToScreenPoint === 'function') 
+                               ? camera.getWorldToScreenPoint(worldPos) : worldPos;
+                targetSource = 'UUID ' + args.uuid.substring(0,6) + ' (World ' + Math.round(worldPos.x) + ',' + Math.round(worldPos.y) + ')';
             } else if (args && (args.x !== undefined || args.y !== undefined)) {
-                worldPos.x = args.x || 0;
-                worldPos.y = args.y || 0;
+                // If AI provides raw x,y, it is assumed strictly as Cocos Screen Coordinates (bottom-left = 0,0)
+                screenPt.x = args.x || 0;
+                screenPt.y = args.y || 0;
+                targetSource = 'Raw ScreenPos (' + screenPt.x + ', ' + screenPt.y + ')';
+            } else {
+                return { error: 'INVALID_ARGS', msg: 'Please provide either uuid or x/y coordinates' };
             }
-
-            let camera = null;
-            if (eng.Camera && eng.Camera.cameras) {
-                camera = eng.Camera.cameras.sort(function(a, b){ return b.depth - a.depth; })[0];
-            }
-            let screenPt = (camera && typeof camera.getWorldToScreenPoint === 'function') 
-                           ? camera.getWorldToScreenPoint(worldPos) : worldPos;
 
             const canvas = document.getElementById('GameCanvas') || document.querySelector('canvas');
             if (!canvas) return { error: 'CANVAS_NOT_FOUND' };
@@ -457,20 +517,55 @@ export function initCrawler() {
             const clientY = rect.bottom - screenPt.y * (rect.height / frameSize.height);
 
             function dispatchNativeEvent(type, cx, cy) {
-                const evt = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: cx, clientY: cy, button: 0 });
-                canvas.dispatchEvent(evt);
+                let dispatched = false;
+                try {
+                    const evt = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: cx, clientY: cy, button: 0 });
+                    canvas.dispatchEvent(evt);
+                    dispatched = true;
+                } catch(e) {}
+
+                try {
+                    const touchMap = { 'mousedown': 'touchstart', 'mousemove': 'touchmove', 'mouseup': 'touchend' };
+                    const tType = touchMap[type];
+                    if (tType && typeof Touch !== 'undefined' && typeof TouchEvent !== 'undefined') {
+                        const touch = new Touch({ identifier: 0, target: canvas, clientX: cx, clientY: cy });
+                        const touchEvt = new TouchEvent(tType, {
+                            bubbles: true, cancelable: true, 
+                            touches: [touch], targetTouches: [touch], changedTouches: [touch]
+                        });
+                        canvas.dispatchEvent(touchEvt);
+                    }
+                } catch(e) {}
             }
 
             const mode = (args && args.inputType) ? args.inputType : 'click';
             const duration = Math.min((args && args.duration) ? args.duration : 100, 3000);
 
+            try { initVisualFeedbackStyle(); } catch(e) {}
+
             dispatchNativeEvent('mousedown', clientX, clientY);
 
+            let visualPointer = document.createElement('div');
+            visualPointer.className = 'mcp-visual-base';
+            visualPointer.style.left = clientX + 'px';
+            visualPointer.style.top = clientY + 'px';
+            document.body.appendChild(visualPointer);
+
             if (mode === 'click') {
+                visualPointer.className += ' mcp-visual-click';
                 setTimeout(function() { dispatchNativeEvent('mouseup', clientX, clientY); }, 50);
+                setTimeout(function() { 
+                    if(visualPointer && visualPointer.parentNode) visualPointer.parentNode.removeChild(visualPointer); 
+                }, 500);
             } else if (mode === 'long_press') {
-                setTimeout(function() { dispatchNativeEvent('mouseup', clientX, clientY); }, duration);
+                visualPointer.className += ' mcp-visual-long-press';
+                visualPointer.style.animationDuration = duration + 'ms';
+                setTimeout(function() { 
+                    dispatchNativeEvent('mouseup', clientX, clientY); 
+                    if(visualPointer && visualPointer.parentNode) visualPointer.parentNode.removeChild(visualPointer);
+                }, duration);
             } else if (mode === 'swipe') {
+                visualPointer.className += ' mcp-visual-swipe';
                 const endX = clientX + ((args && args.swipeDeltaX) ? args.swipeDeltaX : 0);
                 const endY = clientY - ((args && args.swipeDeltaY) ? args.swipeDeltaY : 0);
                 
@@ -478,11 +573,16 @@ export function initCrawler() {
                 function step() {
                     let progress = (Date.now() - startTime) / duration;
                     if (progress >= 1) {
+                        visualPointer.style.left = endX + 'px';
+                        visualPointer.style.top = endY + 'px';
                         dispatchNativeEvent('mousemove', endX, endY);
                         dispatchNativeEvent('mouseup', endX, endY);
+                        if(visualPointer && visualPointer.parentNode) visualPointer.parentNode.removeChild(visualPointer);
                     } else {
                         let curX = clientX + (endX - clientX) * progress;
                         let curY = clientY + (endY - clientY) * progress;
+                        visualPointer.style.left = curX + 'px';
+                        visualPointer.style.top = curY + 'px';
                         dispatchNativeEvent('mousemove', curX, curY);
                         requestAnimationFrame(step);
                     }
@@ -490,7 +590,7 @@ export function initCrawler() {
                 requestAnimationFrame(step);
             }
 
-            return { success: true, msg: 'Simulated ' + mode + ' at (' + worldPos.x.toFixed(1) + ', ' + worldPos.y.toFixed(1) + ')' };
+            return { success: true, msg: 'Simulated ' + mode + ' from ' + targetSource + ' -> Screen DOM (' + Math.round(clientX) + 'px, ' + Math.round(clientY) + 'px)' };
         }
     };
 }

@@ -200,12 +200,12 @@ export const NodeInspector = {
                                         <span class="prop-label array-label" :title="prop.key">{{ prop.name || prop.key }}</span>
                                         <div class="array-size" style="font-size: 11px; color:var(--text-muted);">数量: {{ prop.value ? prop.value.length : 0 }}</div>
                                     </div>
-                                    <div class="array-items" v-if="prop.value && prop.value.length > 0" style="width: 100%; padding-left: 15px; margin-top: 6px; display:flex; flex-direction:column; gap:4px;">
-                                        <div v-for="(item, idx) in prop.value" :key="idx" class="array-item-row" style="display: flex; align-items: center; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 4px;">
+                                    <div class="array-items" v-if="prop.value && prop.value.length > 0" style="width: 100%; padding-left: 15px; margin-top: 6px; display:flex; flex-direction:column; gap:4px; box-sizing: border-box; min-width: 0;">
+                                        <div v-for="(item, idx) in prop.value" :key="idx" class="array-item-row" style="display: flex; align-items: center; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 4px; min-width: 0;">
                                             <span class="array-index" style="font-size: 10px; color:var(--text-muted); width: 28px; text-align: center; margin-right: 4px;">[{{ idx }}]</span>
                                             
                                             <template v-if="item && typeof item === 'object' && item.type === 'node_ref'">
-                                                <div class="asset-link" style="flex:1" @click.stop="onLocateNodeRef(item.value.uuid)">
+                                                <div class="asset-link" style="flex:1; min-width: 0;" @click.stop="onLocateNodeRef(item.value.uuid)">
                                                     <span style="font-size: 11px; padding: 0 2px;">📦</span>
                                                     <span class="asset-name" :title="item.value.uuid">{{ item.value.name }} <span style="color:#777;font-size:9px;">[Node]</span></span>
                                                     <span v-if="item.value.uuid && item.value.uuid !== ''" class="target-mark">🎯</span>
@@ -213,7 +213,7 @@ export const NodeInspector = {
                                             </template>
                                             
                                             <template v-else-if="item && typeof item === 'object' && item.type === 'asset_ref'">
-                                                <div class="asset-link" style="flex:1" @click.stop="onLocateAssetRef(item.value.uuid)">
+                                                <div class="asset-link" style="flex:1; min-width: 0;" @click.stop="onLocateAssetRef(item.value.uuid)">
                                                     <span style="font-size: 11px; padding: 0 2px;">{{ item.value.className === 'cc.SpriteFrame' || item.value.className === 'cc.Texture2D' ? '🖼️' : '🧩' }}</span>
                                                     <span class="asset-name" :title="item.value.uuid">{{ item.value.name }} <span style="color:#777;font-size:9px;">[{{ item.value.className }}]</span></span>
                                                     <span v-if="item.value.uuid && item.value.uuid !== ''" class="target-mark">🎯</span>

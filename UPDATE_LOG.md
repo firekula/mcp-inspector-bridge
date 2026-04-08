@@ -4,6 +4,14 @@
 
 ---
 
+## [0.1.2] - 2026-04-08
+
+### ✨ 新特性
+
+- **MCP 增强：模拟物理交互视觉动效注入 (Simulate Input Visual Feedback)**: 为了解决大语言模型在使用 `simulate_input` 触发场景点击/长按/滑动交互时缺乏直观视觉调试反馈的痛点，创新性地运用透明挂载机制将基于 CSS3 原生 `animation` 驱动的动效容器注入到了游戏渲染画布之上层。现在，所有的跨越时空的模拟行为（单次的涟漪点击、带时效的圆环渲染、跟随轨迹的漂移发光点）都会自动渲染呈现，并且能够在完全不污染游戏本身层叠上下文 (Stacking Context) 下实现“阅后即焚”的安全销毁。
+
+---
+
 ## [0.1.1] - 2026-04-05
 
 ### ✨ 新特性
@@ -15,7 +23,7 @@
 - **属性编辑器支持拉取核心组件原生枚举级联下拉 (Enum Dropdown Support in Inspector)**: 完全重构并兼容渲染继承自 `cc.Component` 的枚举类型，将编辑器原有的单纯数字化表单升级为基于 Web `<select>` 标签构建的可读性选项。并成功向下植入了超 40 种如 `Sprite.type`, `Label.horizontalAlign` 的下拉元数据。
 - **节点属性名称实际字段关联一致化 (Align Node Properties)**: 彻底标准化了 Node Basics 面板属性显示的视觉元素名称，将历史以大写首字母简写的占位符如 Pos/Rot/Size 等全面替换为符合真实载体的 position/contentSize/width/height 小写原生属性命名规范；并且针对旋转轴属性特别植入了针对探针底层的特性嗅探逻辑，能够在 `rotation` 与 `angle` 名称间自适应切换，向使用者传达最精准的环境绑定感知。
 - **Global Info Categorization**: Enhanced the 'Cocos Environment' tab to support dynamically categorized global metrics with `<details>` accordions. Captures exhaustive context including Downloader settings, Dynamic Atlas parameters, 2D Physics metrics, and Collision system configurations.
-- **Preview Resolution Options**: Added 32+ new comprehensive device resolution presets encompassing iOS/iPadOS flagships, standard Android phones, multi-form foldables, and tablets to support thorough UI boundary tests.
+- **Preview Resolution Options**: Added 32+ new comprehensive device resolution presets encompassing iOS/iPadOS flagships, standard Android phones, multi-form foldables, and tablets to support thorough UI boundary tests。
 
 ### 🐛 缺陷修复
 
@@ -27,6 +35,7 @@
   - **方案**：在面板前端通讯层引进“桥接回退提取机制 (Editor Fallback)”：一旦查明 WebView 无法提供合法预制体 uuid，即刻向编辑器发送 `scene:query-node` 读取未阉割的编辑态 JSON Dump 结构数据。并内置了一套高防御性的递归解析器解开所有序列化包裹屏障，精准提取深埋在 `v.prefab` 内原始的 uuid，让跳转功能重焕生机并且覆盖 100% 全场景树实例。
 
 - **模板闭合缺失修复 (Template Tag Fix)**: 修复了重构期间由于替换失误导致的 HTML 标签未闭合产生的 Vue 编译器警告。
+- **修复面板数组列表宽度溢出 (Array List Overflow Fix)**: 修复了属性检查器中，数组型属性（如 Sprite 的 materials 列表）因为缺失盒模型导致整体外向撑开，使得名称长文本资源被截断失效并且遮盖压扁外部靠右定位按钮或显示异常的问题。
 
 ## [0.1.0] - 2026-04-04
 
