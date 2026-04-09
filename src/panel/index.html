@@ -1093,6 +1093,24 @@
                     </div>
                 </div>
 
+                <div style="margin-bottom: 20px; background: #252525; padding: 12px; border-radius: 4px; border: 1px solid #333;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div style="font-size: var(--base-font-size, 13px); font-weight: bold;">MCP 通信运行日志</div>
+                        <div style="display: flex; gap: 5px;">
+                            <button class="icon-btn" style="width: auto; padding: 2px 8px;" @click="globalState.mcpLogs = []">清空日志</button>
+                            <button class="icon-btn" style="width: auto; padding: 2px 8px;" @click="copyMcpLogs">复制</button>
+                        </div>
+                    </div>
+                    <div style="height: 300px; overflow-y: auto; background: #111; padding: 8px; font-family: monospace; font-size: calc(var(--base-font-size, 13px) - 2px); border-radius: 3px;">
+                        <div v-for="(log, i) in globalState.mcpLogs" :key="i" :style="{ color: log.type === 'err' ? '#f44336' : (log.type === 'req' ? '#8bc34a' : '#aaa'), marginBottom: '4px', borderBottom: '1px solid #222', paddingBottom: '4px' }">
+                            <span style="color:#666;">[{{log.time}}]</span>
+                            <span style="margin-left:5px; font-weight:bold;">[{{log.type.toUpperCase()}}]</span>
+                            <span style="margin-left:5px; white-space: pre-wrap; word-break: break-all;">{{log.content}}</span>
+                        </div>
+                        <div v-if="globalState.mcpLogs.length === 0" style="color: #666; text-align: center; margin-top: 10px;">暂无日志数据</div>
+                    </div>
+                </div>
+
                 <div
                     style="margin-bottom: 20px; background: #252525; padding: 12px; border-radius: 4px; border: 1px solid #333;">
                     <div style="font-size: var(--base-font-size, 13px); font-weight: bold; margin-bottom: 8px;">UI

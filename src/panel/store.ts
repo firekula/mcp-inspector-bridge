@@ -32,5 +32,6 @@ export const globalState = reactive({
     mcpSelectedClientId: 0 as number,
     mcpPayload: '' as string,
     mcpScanning: false as boolean,
-    mcpInjectLog: '' as string
+    mcpInjectLog: '' as string,
+    mcpLogs: [] as Array<{time: string, type: 'req'|'res'|'err', content: string}>
 });

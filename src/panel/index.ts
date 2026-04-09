@@ -406,6 +406,22 @@ module.exports = Editor.Panel.extend({
                     }
                 };
 
+                const copyMcpLogs = () => {
+                    const text = globalState.mcpLogs.map((l: any) => `[${l.time}] [${l.type.toUpperCase()}] ${l.content}`).join('\\n');
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).then(() => {
+                            showMcpToast("已复制全部日志");
+                        }).catch((e:any) => showMcpToast("复制日志失败: " + e));
+                    } else {
+                        const textArea = document.createElement("textarea");
+                        textArea.value = text;
+                        document.body.appendChild(textArea);
+                        textArea.select();
+                        try { document.execCommand('copy'); showMcpToast("已复制全部日志"); } catch (err) {}
+                        document.body.removeChild(textArea);
+                    }
+                };
+
                 return {
                     activeTab,
                     globalState,
@@ -473,6 +489,7 @@ module.exports = Editor.Panel.extend({
                     configureMcpClient,
                     copyMcpPayload,
                     copyMcpPath,
+                    copyMcpLogs,
                     
                     ...layoutSystem,
                     ...tabSystem,
@@ -645,6 +662,12 @@ module.exports = Editor.Panel.extend({
         },
         'scene-status-changed'(event: any, payload: any) {
             window.dispatchEvent(new CustomEvent('scene-status-changed', { detail: payload }));
+        },
+        'mcp-inspector-bridge:mcp-log'(event: any, logItem: any) {
+            globalState.mcpLogs.push(logItem);
+            if (globalState.mcpLogs.length > 200) {
+                globalState.mcpLogs.shift();
+            }
         },
         'mcp-status-changed'(event: any, payload: any) {
             window.dispatchEvent(new CustomEvent('mcp-status-changed', { detail: payload }));

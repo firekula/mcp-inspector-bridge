@@ -41,20 +41,33 @@ function handleCaptureScreenshot(ws: WebSocket.WebSocket, reqId: string) {
     });
 
     if (!targetWc) {
+        const errText = "未能找到活跃的预览画面，请确认预览面板已打开。";
+        try { Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'mcp-inspector-bridge:mcp-log', { type: 'err', time: new Date().toLocaleTimeString(), content: `[capture_runtime_screenshot]\nError: ${errText}` }); } catch(e) {}
         ws.send(JSON.stringify({
             jsonrpc: "2.0", id: reqId,
-            result: { isError: true, content: [{ type: "text", text: "未能找到活跃的预览画面，请确认预览面板已打开。" }] }
+            result: { isError: true, content: [{ type: "text", text: errText }] }
         }));
         return;
     }
 
     const handleImage = (img: any) => {
         if (!img || img.isEmpty()) {
-            ws.send(JSON.stringify({ jsonrpc: "2.0", id: reqId, result: { isError: true, content: [{ type: "text", text: "获取画面为空，可能处于后台" }] }}));
+            const errText = "获取画面为空，可能处于后台";
+            try { Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'mcp-inspector-bridge:mcp-log', { type: 'err', time: new Date().toLocaleTimeString(), content: `[capture_runtime_screenshot]\nError: ${errText}` }); } catch(e) {}
+            ws.send(JSON.stringify({ jsonrpc: "2.0", id: reqId, result: { isError: true, content: [{ type: "text", text: errText }] }}));
             return;
         }
         const dataUrl = img.toDataURL();
         const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
+        
+        try { 
+            Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'mcp-inspector-bridge:mcp-log', { 
+                type: 'res', 
+                time: new Date().toLocaleTimeString(), 
+                content: `[capture_runtime_screenshot]\nResult: { type: "image", data: "${base64Data.substring(0, 100)}...[截断:${base64Data.length} chars]" }` 
+            }); 
+        } catch(e) {}
+
         ws.send(JSON.stringify({
             jsonrpc: "2.0", id: reqId,
             result: {
@@ -69,6 +82,7 @@ function handleCaptureScreenshot(ws: WebSocket.WebSocket, reqId: string) {
     const result = targetWc.capturePage();
     if (result && typeof result.then === 'function') {
         result.then(handleImage).catch((e: any) => {
+            try { Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'mcp-inspector-bridge:mcp-log', { type: 'err', time: new Date().toLocaleTimeString(), content: `[capture_runtime_screenshot]\nError: 截图异常: ${e.message}` }); } catch(e) {}
             ws.send(JSON.stringify({ jsonrpc: "2.0", id: reqId, result: { isError: true, content: [{ type: "text", text: "截图异常: " + e.message }] }}));
         });
     } else if (result) {
@@ -102,13 +116,31 @@ export function startMcpRouter(onStatusChange: (status: any) => void): { close: 
                     try {
                         const data = JSON.parse(message.toString());
                         if (data.type === 'ping') {
+                            try {
+                                Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'mcp-inspector-bridge:mcp-log', {
+                                    time: new Date().toLocaleTimeString(),
+                                    type: 'req',
+                                    content: `[System] ping`
+                                });
+                            } catch (e) {}
+
                             const projectPath = Editor.Project.path || 'Unknown';
-                            ws.send(JSON.stringify({ 
+                            const resPayload = { 
                                 type: 'pong',
                                 port: _port,
                                 projectPath: projectPath,
                                 projectName: require('path').basename(projectPath)
-                            }));
+                            };
+
+                            try {
+                                Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'mcp-inspector-bridge:mcp-log', {
+                                    time: new Date().toLocaleTimeString(),
+                                    type: 'res',
+                                    content: `[System] pong\nResult: ${JSON.stringify(resPayload)}`
+                                });
+                            } catch (e) {}
+
+                            ws.send(JSON.stringify(resPayload));
                             return;
                         }
                     
@@ -116,6 +148,14 @@ export function startMcpRouter(onStatusChange: (status: any) => void): { close: 
                         const name = data.params.name;
                         const args = data.params.args || {};
                         const reqId = data.id || Date.now().toString();
+
+                        try {
+                            Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'mcp-inspector-bridge:mcp-log', {
+                                time: new Date().toLocaleTimeString(),
+                                type: 'req',
+                                content: `[${name}]\nArgs: ${JSON.stringify(args, null, 2)}`
+                            });
+                        } catch (e) {}
 
                         if (name === 'capture_runtime_screenshot') {
                             handleCaptureScreenshot(ws, reqId);
@@ -155,10 +195,26 @@ export function startMcpRouter(onStatusChange: (status: any) => void): { close: 
                                         _hint: 'attached=false 表示未找到预览页面或 debugger attach 失败',
                                     }, null, 2);
                                 }
+                                try {
+                                    let resText = finalContent;
+                                    if (resText.length > 500) resText = resText.substring(0, 500) + '...[truncated:超长响应已截断]';
+                                    Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'mcp-inspector-bridge:mcp-log', {
+                                        time: new Date().toLocaleTimeString(),
+                                        type: 'res',
+                                        content: `[${name}]\nResult: ${resText}`
+                                    });
+                                } catch (e) {}
                                 ws.send(JSON.stringify({ jsonrpc: "2.0", id: reqId, result: { content: [{ type: "text", text: finalContent }] } }));
                                 return; // 已处理，不再走面板 IPC
                             } catch (err: any) {
                                 // CDP 查询失败时返回错误信息
+                                try {
+                                    Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'mcp-inspector-bridge:mcp-log', {
+                                        time: new Date().toLocaleTimeString(),
+                                        type: 'err',
+                                        content: `[${name}]\nError: ${err.message}`
+                                    });
+                                } catch (e) {}
                                 ws.send(JSON.stringify({
                                     jsonrpc: "2.0", id: reqId,
                                     result: { content: [{ type: "text", text: `CDP 日志不可用: ${err.message}` }], isError: true }
@@ -189,8 +245,25 @@ export function startMcpRouter(onStatusChange: (status: any) => void): { close: 
                                 CACHE[cacheKey] = { timestamp: Date.now(), data: resultPayload };
                             }
 
+                            try {
+                                let resText = contentText;
+                                if (resText.length > 500) resText = resText.substring(0, 500) + '...[truncated:超长响应已截断]';
+                                Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'mcp-inspector-bridge:mcp-log', {
+                                    time: new Date().toLocaleTimeString(),
+                                    type: (!res || res.error) ? 'err' : 'res',
+                                    content: `[${name}]\nResult: ${resText}`
+                                });
+                            } catch (e) {}
+
                             ws.send(JSON.stringify({ jsonrpc: "2.0", id: reqId, result: resultPayload }));
                         } catch (err: any) {
+                            try {
+                                Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'mcp-inspector-bridge:mcp-log', {
+                                    time: new Date().toLocaleTimeString(),
+                                    type: 'err',
+                                    content: `[${name}]\nError: ${err.message}`
+                                });
+                            } catch (e) {}
                             ws.send(JSON.stringify({
                                 jsonrpc: "2.0",
                                 id: reqId,
