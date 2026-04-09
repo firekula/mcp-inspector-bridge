@@ -4,6 +4,26 @@
 
 ---
 
+## [0.1.5] - 2026-04-09
+
+### ✨ 新特性
+
+- **MCP 多实例支持及动态端口寻址 (Multi-Instance Support & Dynamic Port Allocation)**: 为解决同时运行多个 Cocos Creator 项目时发生的端口冲突 (`EADDRINUSE`) 这一阻碍痛点，重构了底层中控网关，为 AI 开启了能够掌控多开平行宇宙的钥匙。
+  - **动态端口递推注入**: 彻底解放硬编码端口（默认 4456），当端口被占用时实现无限自动累加探测直至锁定可用端口。
+  - **基于项目身份的握手协议 (Project Identity Handshake)**: 拦截并扩展底层探测的 Ping/Pong 心跳回执，向心跳回包中注入包括 `projectName` 与 `projectPath` 在内的项目特征元数据，确保端口与对应编辑器实例 1v1 绑定。
+  - **AI 动态路由系统与扫描截获 (AI Dynamic Routing & Scanning)**: 当 AI 未明确目标时自动拦截并要求指定具体通讯端口；新增广域端口扫描能力，同时实装两个重要的 MCP 路由工具：
+    - `get_active_instances`: 主动探测并返回当前运行中所有的 Cocos Creator 实例及其对应端口和名称等身份信息。
+    - `set_active_instance`: 允许 AI 锁定目标实例的通讯端口，保障 RPC 通令的定向送达。
+
+### 🧹 代码整理
+
+- **重构与清理 (Refactor & Cleanup)**
+  - 删除多实例验证用测试死代码 `test-multi-instance.js`，保持代码库整洁。
+  - 为 `main.ts` 中的 `getBaseName` 补充标准的 JSDoc 注释。
+  - 更新 README 特性说明和项目结构，补全多实例机制文档。
+
+---
+
 ## [0.1.4] - 2026-04-08
 
 ### ✨ 新特性

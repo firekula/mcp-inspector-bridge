@@ -3,6 +3,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { getActiveInstance, setActiveInstance, scanActiveInstances } from "./index";
 
 export function setupTools(server: Server, sendRpcToCocos: (method: string, args?: any) => Promise<any>) {
     server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -23,7 +24,22 @@ export function setupTools(server: Server, sendRpcToCocos: (method: string, args
                     description: "Capture the real-time screen of the game, including game UI and rendering elements. Return it as an image.",
                     inputSchema: { type: "object", properties: {}, required: [] },
                 },
-                // new tools for Phase B
+                // --- 多开与通讯增强 ---
+                {
+                    name: "get_active_instances",
+                    description: "Scan local ports (4456-4556) to find all running Cocos Creator instances and return their project paths and connection ports.",
+                    inputSchema: { type: "object", properties: {}, required: [] },
+                },
+                {
+                    name: "set_active_instance",
+                    description: "Manually bind the MCP client to a specific Cocos Creator instance's port. Call this before using other tools when multiple instances are running.",
+                    inputSchema: { 
+                        type: "object", 
+                        properties: { port: { type: "number", description: "The port number of the target instance to connect to." } }, 
+                        required: ["port"] 
+                    },
+                },
+                // --- 资产与组件交互 ---
                 {
                     name: "get_node_detail",
                     description: "Get detailed information about a node by UUID.",
@@ -108,7 +124,19 @@ export function setupTools(server: Server, sendRpcToCocos: (method: string, args
         try {
             if (name === "ping") {
                 await sendRpcToCocos('ping');
-                return { content: [{ type: "text", text: "来自 Cocos 插件的响应：pong (MCP 协议已打通)" }] };
+                return { content: [{ type: "text", text: `来自 Cocos 插件的响应：pong (MCP 协议已打通，当前焦点端口: ${getActiveInstance() || '默认'})` }] };
+            }
+            if (name === "get_active_instances") {
+                const instances = await scanActiveInstances();
+                return { content: [{ type: "text", text: JSON.stringify(instances, null, 2) }] };
+            }
+            if (name === "set_active_instance") {
+                const port = Number(args.port);
+                if (port >= 4456 && port <= 65535) {
+                    setActiveInstance(port);
+                    return { content: [{ type: "text", text: `焦点已切换至端口: ${port}` }] };
+                }
+                throw new Error(`Invalid port: ${port}`);
             }
             // For others, simply proxy to Cocos via general RPC
             const result = await sendRpcToCocos(name, args);

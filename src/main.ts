@@ -1,9 +1,22 @@
 'use strict';
 import * as WebSocket from 'ws';
+// Removed Node path import; using custom getBaseName function
 import { startMcpRouter } from './ipc-router';
 declare const Editor: any;
 
 let _isSceneActive = false;
+
+/**
+ * 跨平台路径 Basename 提取工具（不依赖 Node.js path 模块）
+ * 用于在编辑器不同环境（Main/Render）下安全获取工程目录名
+ * @param p 待处理的完整路径字符串
+ * @returns 路径的最后一个片段（项目文件夹名称）
+ */
+function getBaseName(p: string): string {
+  if (!p) return '';
+  const parts = p.split(/[\\/]/);
+  return parts[parts.length - 1] || '';
+}
 
 let _wss: WebSocket.Server | null = null;
 let _mcpStatus = { active: false, port: 4456, error: 'Initializing...' };
@@ -16,23 +29,23 @@ module.exports = {
     load() {
         // [Backend] 启动时假定场景还未完全就绪，等待 scene:ready
         _isSceneActive = false;
-        
         try {
-            const router = startMcpRouter(4456);
-            _wss = router.wss;
-            _mcpStatus = router.status;
-            
-            Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'mcp-status-changed', _mcpStatus);
-            if (_mcpStatus.active) {
-                Editor.log('[MCP] Bridge started on ws://localhost:4456');
-            } else {
-                Editor.error('[MCP] Failed to start WebSocket server:', _mcpStatus.error);
-            }
+            const router = startMcpRouter((status: any) => {
+                _mcpStatus = { ...status, projectName: getBaseName(Editor.Project.path || ''), projectPath: Editor.Project.path || '' };
+                Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'mcp-status-changed', _mcpStatus);
+                if (status.active) {
+                    Editor.log(`[MCP] Bridge started on ws://localhost:${status.port}`);
+                } else if (status.error) {
+                    Editor.error(`[MCP] WebSocket server error on port ${status.port}:`, status.error);
+                }
+            });
+            (_wss as any) = router;
         } catch(err: any) {
             _mcpStatus = { active: false, port: 4456, error: err.message || 'Unknown error' };
             Editor.Ipc.sendToPanel('mcp-inspector-bridge', 'mcp-status-changed', _mcpStatus);
             Editor.error('[MCP] Failed to start WebSocket server:', err);
         }
+
 
         // 立即进入激进的全天候日志监听器自动注入探测（用于彻底捕获极早期的报错）
         _logHeartbeatTimer = setInterval(async () => {

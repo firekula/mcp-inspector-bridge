@@ -62,19 +62,15 @@ npm run build
 - **包围盒高亮**：鼠标悬停/选中节点时，游戏画面实时渲染精准的贴边多边形轮廓，零宽高节点自动降级为十字准星
 - **屏幕拾取器**：直接在游戏画面中点击选取节点，基于多摄像机阵列扫描 + CullingMask 分组继承 + 面积权重透层算法，完美适配多镜头、多分组、Fit 缩放等复杂场景
 
-### 🤖 AI MCP 集成桥 (New)
+### 🤖 AI MCP 集成桥 (Multi-Instance Ready)
 
 为 LLM (大模型如 Claude/Cursor) 提供双端通信与跨进程的游戏引擎交互视界。
-- **多端全平台自动配置**：具备超越单体绑定的挂载能力，支持向 22 款主流 AI 客户端（如 Claude Desktop、Windsurf、Zed、VSCode 扩展族、Trae 等）进行自动探测与免配桥接。
-- **WebSocket 中控**：内置宿主的 `4456` 端口 WebSocket 桥接器，在不影响编辑器性能的基础上完成局域网互通。
-- **JSON-RPC 只读探针**：提供专为空手脱离上下文开发的节点结构选读探针 (Stage 2)，将冗长繁杂的树形字典归纳为纯净的序列化数据以应对请求溢出与幻觉。
-- **可控剪裁的节点字典树**：支持根据 `depth` 参数安全获取特定层级的宏观骨架，全景掌握 UI 场景关系树而不用担心触发 Context 上下文爆炸。
-- **超保真渲染验证实况图**：直接为大语言模型一键注入人类视角的运行时截图 (Stage 3)，打破次元壁实现深层次的布局验证与交互推演。
-- **IPC 异步防洪**：主进程代理所有的底层 RPC 网络与 WebContents 拦截指令，脱离 Shadow DOM 局限并构筑防御性编程墙。
-- **环境安全异常零漏截获 (Eager Log Capture)**：基于 CDP 底层协议加上每秒后台激进式对象探测双轨防御。在游戏初始化第一帧甚至核心渲染开启前强制接管 `console` 和 `cc.error`。使用 RingBuffer 防止内存侧漏爆炸（1000条容量，2000字截断防崩），让 AI 时刻感知环境黑盒崩溃且不惧长栈阻塞。
-- **全息物理原域交互代理**：推演全局 DOM 映射靶点并倾泻 `MouseEvent` 以精准触发死角节点与长按拖拽。
-- **全局基础配置注入 (Prompts)**：挂载 `cocos-api-24x` Prompt 指示词保障 AI 编码不会越界。
-- **运行时性能分析闭环 (Resource & Tools)**：开放 `scene://hierarchy` 的宏观全景树资源订阅与 `get_runtime_stats` 工具的运行时帧率/端渲染数据嗅探。
+- **多实例动态寻址 (Multi-Instance Support)**：内置 `EADDRINUSE` 冲突递增机制，支持同时开启多个编辑器实例，实现不同项目端口的自动隔离（默认 4456）。
+- **基于项目身份的握手协议**：心跳回执注入 `projectName` 与 `projectPath`，允许 AI 快速识别目标平行宇宙。
+- **多端全平台自动配置**：支持向 22 款主流 AI 客户端（如 Claude Desktop、Cursor 等）进行自动探测与免配桥接。
+- **MCP 路由工具扩展**：提供 `get_active_instances` 扫描活跃端口及 `set_active_instance` 绑定指定项目端口。
+- **环境安全异常零漏截获 (Eager Log Capture)**：基于 CDP 底层协议加上每秒后台激进式对象探测双轨防御。在游戏初始化第一帧强行接管日志。
+- **超保真渲染验证实况图**：直接为大语言模型一键注入运行时截图，打破次元壁。
 
 ### 🔍 属性检查器
 
@@ -145,7 +141,7 @@ npm run build
 |------|------|
 | **场景校验沙盒** | 以 IPC `isEditorSceneActive` 为唯一放行条件，未就绪时完全不访问预览服务器，根治 `stashScene` 崩溃 |
 | **后台挂起复原** | `ResizeObserver` + `pendingRefresh` 标记，后台切回自动恢复画面 |
-| **多实例端口适配** | 自动探测 `7456~7466` 活跃端口，多开编辑器不串台 |
+| **多实例端口适配** | 核心桥接器端口自动冲突探测并向上扫描，多开项目实例互不串台 |
 | **IPC 降级容错** | 原生通道失联时自动切入 DOM 轮询，2 秒后静默警告 |
 | **单向数据流** | 严格杜绝面板↔探针的 IPC 递归循环 |
 | **Scene 节点只读** | 自动拦截 `cc.Scene` 属性访问，防止引擎报错 |
@@ -182,12 +178,12 @@ mcp-inspector-bridge/
 │   │       ├── NodeInspector.ts # 属性检查器
 │   │       ├── RenderDebugger.ts # 渲染调试器
 │   │       └── WidgetVisualizer.ts # Widget 可视化
-│   ├── mcp-client/            # MCP 原生客户端与服务层 (esbuild → dist/mcp-client/index.js)
-│   │   ├── index.ts           # MCP Stdio 服务器入口
-│   │   ├── tools.ts           # MCP 工具定义与请求处理
-│   │   ├── resources.ts       # MCP 资源订阅定义
-│   │   ├── prompts.ts         # MCP 提示词策略下发
-│   │   └── configurator.ts    # MCP 自动构建挂载选项管理
+│   ├── mcp-client/            # MCP 原生客户端与服务层
+│   │   ├── index.ts           # MCP Stdio 服务器入口，处理多实例扫描与路由切换
+│   │   ├── tools.ts           # MCP 工具集定义 (ping, get_active_instances, etc.)
+│   │   ├── resources.ts       # MCP 资源订阅定义 (scene://hierarchy)
+│   │   ├── prompts.ts         # MCP 提示词下发策略
+│   │   └── configurator.ts    # 22+ 款主流 AI 客户端配置自动注入器
 │   └── probe/                 # 探针模块 (esbuild → dist/probe.js)
 │       ├── index.ts           # 探针主入口与生命周期
 │       ├── crawler.ts         # 节点树爬虫

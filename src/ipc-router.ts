@@ -76,20 +76,41 @@ function handleCaptureScreenshot(ws: WebSocket.WebSocket, reqId: string) {
     }
 }
 
-export function startMcpRouter(port: number): { wss: WebSocket.Server, status: any } {
+export function startMcpRouter(onStatusChange: (status: any) => void): { close: () => void } {
     let _wss: WebSocket.Server | null = null;
-    let _mcpStatus = { active: false, port, error: 'Initializing...' };
+    let _port = 4456;
 
-    try {
-        _wss = new WebSocket.Server({ port });
-        _wss.on('connection', (ws) => {
-            ws.on('message', async (message) => {
-                try {
-                    const data = JSON.parse(message.toString());
-                    if (data.type === 'ping') {
-                        ws.send(JSON.stringify({ type: 'pong' }));
-                        return;
-                    }
+    const tryListen = () => {
+        try {
+            _wss = new WebSocket.Server({ port: _port });
+            
+            _wss.on('error', (e: any) => {
+                if (e.code === 'EADDRINUSE') {
+                    _port++;
+                    tryListen();
+                } else {
+                    onStatusChange({ active: false, port: _port, error: e.message || 'Unknown network error' });
+                }
+            });
+
+            _wss.on('listening', () => {
+                onStatusChange({ active: true, port: _port, error: '' });
+            });
+
+            _wss.on('connection', (ws) => {
+                ws.on('message', async (message) => {
+                    try {
+                        const data = JSON.parse(message.toString());
+                        if (data.type === 'ping') {
+                            const projectPath = Editor.Project.path || 'Unknown';
+                            ws.send(JSON.stringify({ 
+                                type: 'pong',
+                                port: _port,
+                                projectPath: projectPath,
+                                projectName: require('path').basename(projectPath)
+                            }));
+                            return;
+                        }
                     
                     if (data.method === 'tools/call' && data.params) {
                         const name = data.params.name;
@@ -180,10 +201,19 @@ export function startMcpRouter(port: number): { wss: WebSocket.Server, status: a
                 } catch(e) {}
             });
         });
-        _mcpStatus = { active: true, port, error: '' };
-    } catch(err: any) {
-        _mcpStatus = { active: false, port, error: err.message || 'Unknown error' };
-    }
+        } catch(err: any) {
+            onStatusChange({ active: false, port: _port, error: err.message || 'Unknown error' });
+        }
+    };
 
-    return { wss: _wss!, status: _mcpStatus };
+    tryListen();
+
+    return { 
+        close: () => {
+            if (_wss) {
+                try { _wss.close(); } catch(e) {}
+                _wss = null;
+            }
+        } 
+    };
 }

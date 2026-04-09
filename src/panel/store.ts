@@ -23,7 +23,7 @@ export const globalState = reactive({
     isInspectorHovered: false as boolean,
     isEditorSceneActive: false as boolean,
     isNodePickerActive: false as boolean,
-    mcpStatus: { active: false, port: 4456, error: '' } as { active: boolean, port: number, error: string },
+    mcpStatus: { active: false, port: 4456, error: '', projectName: '', projectPath: '' } as { active: boolean, port: number, error: string, projectName: string, projectPath: string },
     previewPort: 7456 as number,
     uiScale: 1.0 as number,
     baseFontSize: 13 as number,
