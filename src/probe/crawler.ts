@@ -422,6 +422,21 @@ export function initCrawler() {
             }
         },
 
+        printNodeData: function (uuid) {
+            const node = this.findNodeByUuid(uuid);
+            if (!node || !node.isValid) {
+                console.warn("[MCP Crawler] Target node not found for printing.", uuid);
+                return;
+            }
+
+            try {
+                console.log('%c[MCP] 节点 (' + node.name + ') 数据已打印 👇', 'color: #00ff00; font-weight: bold;');
+                console.dir(node);
+            } catch (err) {
+                console.error("[MCP Crawler] 打印节点数据时发生异常: ", err);
+            }
+        },
+
         getNodeWorldPolygon: function (target) {
             const eng = window.cc;
             if (!target || typeof target.convertToWorldSpaceAR !== 'function') return null;

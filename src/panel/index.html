@@ -593,7 +593,8 @@
                         style="flex: 1; overflow-y: auto; background: var(--bg-main); min-width: 0; min-height: 0; position: relative; padding: 10px;">
                         <node-inspector :node-detail="globalState.nodeDetail" @update-prop="onUpdateNodeProp"
                             @hover-change="globalState.isInspectorHovered = $event" @locate-node="onLocateNode"
-                            @locate-asset="onLocateAsset" @print-comp="onPrintComp"></node-inspector>
+                            @locate-asset="onLocateAsset" @print-comp="onPrintComp"
+                            @print-node="onPrintNode"></node-inspector>
                         <div v-show="isNodeTreeDragging" style="position: absolute; inset: 0; z-index: 99;"></div>
                     </div>
                 </div>

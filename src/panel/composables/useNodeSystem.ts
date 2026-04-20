@@ -270,6 +270,19 @@ export function useNodeSystem(globalState: any, gameView: any, nodeTreeRef: any,
         }
     };
 
+    const onPrintNode = (uuid: string) => {
+        const wv: any = gameView.value;
+        if (wv) {
+            const code = `
+                if (window.__mcpCrawler && typeof window.__mcpCrawler.printNodeData === 'function') {
+                    window.__mcpCrawler.printNodeData('${uuid}');
+                }
+            `;
+            const __p = wv.executeJavaScript(code);
+            if (__p && __p.catch) __p.catch(() => {});
+        }
+    };
+
     // 自动刷新逻辑
     let autoRefreshTimer: any = null;
     const startAutoRefresh = () => {
@@ -303,6 +316,7 @@ export function useNodeSystem(globalState: any, gameView: any, nodeTreeRef: any,
         locateResource,
         onLocateNode,
         onLocateAsset,
-        onPrintComp
+        onPrintComp,
+        onPrintNode
     };
 }

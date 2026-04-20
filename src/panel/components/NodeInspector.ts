@@ -8,7 +8,7 @@ export const NodeInspector = {
             default: null
         }
     },
-    emits: ['update-prop', 'hover-change', 'locate-node', 'locate-asset', 'print-comp'],
+    emits: ['update-prop', 'hover-change', 'locate-node', 'locate-asset', 'print-comp', 'print-node'],
     template: `
         <div class="node-inspector-wrap" style="padding: 10px; overflow-y: auto; height: 100%; color: #d0d0d0;"
              @mouseenter="onHover(true)" @mouseleave="onHover(false)">
@@ -36,6 +36,7 @@ export const NodeInspector = {
                                 <span v-if="nodeDetail.prefabUuid" @click.stop="$emit('locate-asset', nodeDetail.prefabUuid)" style="cursor: pointer; font-size: 14px; margin-left: 8px; color: var(--accent-blue); filter: drop-shadow(0 0 4px var(--accent-blue));" title="在资源管理器中定位预制体">🎯</span>
                             </div>
                             <div class="header-right">
+                                <span class="print-btn" @click.stop="onPrintNode" title="在控制台直接打印该节点对象" style="cursor: pointer; margin-right: 6px;">🖨️</span>
                                 <span class="size-tag" style="background: rgba(0,0,0,0.3); border-color: transparent;">Node</span>
                             </div>
                         </div>
@@ -305,6 +306,12 @@ export const NodeInspector = {
             emit('print-comp', uuid, compIndex);
         };
 
+        const onPrintNode = () => {
+            if (props.nodeDetail && props.nodeDetail.id) {
+                emit('print-node', props.nodeDetail.id);
+            }
+        };
+
         return {
             expandedComps,
             toggleComp,
@@ -313,7 +320,8 @@ export const NodeInspector = {
             formatNumber,
             onLocateNodeRef,
             onLocateAssetRef,
-            onPrintComponent
+            onPrintComponent,
+            onPrintNode
         };
     }
 };
