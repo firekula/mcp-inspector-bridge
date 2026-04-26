@@ -58,23 +58,17 @@ export function useGameView(
 
     function refreshGame() {
         if (!globalState.isEditorSceneActive) {
-            if (typeof Editor !== 'undefined') Editor.warn('[Bridge] 场景未激活，刷新操作暂被拦截以防报错。');
             console.warn('[Bridge] 场景未激活，刷新操作暂被拦截以防报错。');
             return;
         }
 
         const wv: any = gameView.value;
         if (wv && (wv.clientWidth === 0 || wv.clientHeight === 0)) {
-            if (typeof Editor !== 'undefined') Editor.log('[Bridge] 面板处于后台或可见区域为零，当前刷新请求已被防黑屏机制挂起 (Pending Refresh)...');
             console.log('[Bridge] 面板处于后台或可见区域为零，当前刷新请求已被防黑屏机制挂起 (Pending Refresh)...');
             pendingRefresh = true;
             return;
         }
 
-        if (typeof Editor !== 'undefined') {
-            Editor.log('[Bridge] 触发手动刷新重载游戏视图...');
-            Editor.log(new Error('[Trace] refreshGame 调用栈').stack);
-        }
         console.log('[Bridge] 触发手动刷新重载游戏视图...');
         pendingRefresh = false;
 
