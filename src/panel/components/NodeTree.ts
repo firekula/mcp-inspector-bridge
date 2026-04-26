@@ -18,38 +18,40 @@ export const NodeTree = {
                     &times;
                 </span>
             </div>
-            <div class="tree-content">
-                <div v-if="visibleNodes.length === 0" class="empty-hint">
-                    没有找到匹配的节点
-                </div>
-                <div v-for="node in visibleNodes" :key="node.id" 
-                     class="tree-node" 
-                     :class="[
-                        { 
-                            active: node.id === selectedId, 
-                            inactive: !node.activeInHierarchy 
-                        },
-                        getPrefabClass(node)
-                     ]"
-                     :style="{ paddingLeft: (node.depth * 15 + 5) + 'px' }"
-                     @click="selectNode(node)"
-                     @mouseenter="hoverNode(node)"
-                     @mouseleave="clearHover()">
-                     
-                    <span class="caret" 
-                          :class="{ expanded: node.expanded, hidden: !node.hasChildren }"
-                          @click.stop="toggleExpand(node)">▶</span>
-                          
-                    <span class="node-icon" v-if="getIcon(node)">{{ getIcon(node) }}</span>
-                    <span class="node-name" v-html="highlight(node.name, node.isMatch)"></span>
-                    
-                    <span v-if="node.matchedComponent" style="margin-left: auto; font-size: 11px; color: #888; display: inline-block;">
-                        ({{ node.matchedComponent }})
-                    </span>
-                    
-                    <span v-if="node.componentsCount > 0" class="comp-badge" :style="node.matchedComponent ? 'margin-left: 5px;' : ''">
-                        {{ node.componentsCount }} 📄
-                    </span>
+            <div class="tree-content" style="padding-bottom: 0;">
+                <div style="min-width: 100%; width: max-content; padding-bottom: 5px;">
+                    <div v-if="visibleNodes.length === 0" class="empty-hint">
+                        没有找到匹配的节点
+                    </div>
+                    <div v-for="node in visibleNodes" :key="node.id" 
+                         class="tree-node" 
+                         :class="[
+                            { 
+                                active: node.id === selectedId, 
+                                inactive: !node.activeInHierarchy 
+                            },
+                            getPrefabClass(node)
+                         ]"
+                         :style="{ paddingLeft: (node.depth * 15 + 5) + 'px' }"
+                         @click="selectNode(node)"
+                         @mouseenter="hoverNode(node)"
+                         @mouseleave="clearHover()">
+                         
+                        <span class="caret" 
+                              :class="{ expanded: node.expanded, hidden: !node.hasChildren }"
+                              @click.stop="toggleExpand(node)">▶</span>
+                              
+                        <span class="node-icon" v-if="getIcon(node)">{{ getIcon(node) }}</span>
+                        <span class="node-name" v-html="highlight(node.name, node.isMatch)"></span>
+                        
+                        <span v-if="node.matchedComponent" style="margin-left: auto; font-size: 11px; color: #888; display: inline-block;">
+                            ({{ node.matchedComponent }})
+                        </span>
+                        
+                        <span v-if="node.componentsCount > 0" class="comp-badge" :style="node.matchedComponent ? 'margin-left: 5px;' : ''">
+                            {{ node.componentsCount }} 📄
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
