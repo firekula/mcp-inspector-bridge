@@ -58,17 +58,23 @@ export function useGameView(
 
     function refreshGame() {
         if (!globalState.isEditorSceneActive) {
+            if (typeof Editor !== 'undefined') Editor.warn('[Bridge] 场景未激活，刷新操作暂被拦截以防报错。');
             console.warn('[Bridge] 场景未激活，刷新操作暂被拦截以防报错。');
             return;
         }
 
         const wv: any = gameView.value;
         if (wv && (wv.clientWidth === 0 || wv.clientHeight === 0)) {
+            if (typeof Editor !== 'undefined') Editor.log('[Bridge] 面板处于后台或可见区域为零，当前刷新请求已被防黑屏机制挂起 (Pending Refresh)...');
             console.log('[Bridge] 面板处于后台或可见区域为零，当前刷新请求已被防黑屏机制挂起 (Pending Refresh)...');
             pendingRefresh = true;
             return;
         }
 
+        if (typeof Editor !== 'undefined') {
+            Editor.log('[Bridge] 触发手动刷新重载游戏视图...');
+            Editor.log(new Error('[Trace] refreshGame 调用栈').stack);
+        }
         console.log('[Bridge] 触发手动刷新重载游戏视图...');
         pendingRefresh = false;
 
@@ -404,13 +410,16 @@ export function useGameView(
                             if (nt && typeof nt.expandToNode === 'function') {
                                 const success = nt.expandToNode(uuid);
                                 if (!success) {
-                                    refreshGame();
-                                    setTimeout(() => {
-                                        const newNt: any = nodeTreeRef.value;
-                                        if (newNt && typeof newNt.expandToNode === 'function') {
-                                            newNt.expandToNode(uuid);
+                                    console.warn(`[Bridge] 节点树缓存中未找到节点(UUID: ${uuid})，启用属性兜底同步`);
+                                    onNodeSelectFallback({ id: uuid }, true);
+                                    
+                                    try {
+                                        const syncCode = "if(window.__mcpSyncNodeTree) { window.__mcpSyncNodeTree(); }";
+                                        const wv: any = gameView.value;
+                                        if (wv && typeof wv.executeJavaScript === 'function') {
+                                            wv.executeJavaScript(syncCode).catch(() => {});
                                         }
-                                    }, 800);
+                                    } catch(err) {}
                                 }
                             } else {
                                 onNodeSelectFallback({ id: uuid }, true);
