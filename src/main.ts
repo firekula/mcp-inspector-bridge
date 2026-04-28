@@ -210,6 +210,116 @@ module.exports = {
                 if (event.reply) event.reply(null, "配置写入报错: " + e.message);
             }
         },
+        // --- 用户脚本系统: 文件 I/O handlers ---
+        'script-save-file'(event: any, args: { fileName: string; content: string }) {
+            const fs = require('fs');
+            const path = require('path');
+            const extDir = path.join(Editor.Project.path || __dirname, 'extensions');
+            if (!fs.existsSync(extDir)) fs.mkdirSync(extDir, { recursive: true });
+            const filePath = path.join(extDir, args.fileName);
+            fs.writeFileSync(filePath, args.content, 'utf-8');
+
+            const profile = Editor.Profile.load('profile://project/mcp-scripts.json', 'mcp-inspector-bridge');
+            const scripts = profile.get('scripts') || {};
+            const key = args.fileName.replace(/\.user\.js$/i, '');
+            scripts[key] = { enabled: true, installedAt: Date.now() };
+            profile.set('scripts', scripts);
+            profile.save();
+
+            if (event.reply) event.reply(null, { success: true });
+        },
+        'script-delete-file'(event: any, args: { fileName: string }) {
+            const fs = require('fs');
+            const path = require('path');
+            const extDir = path.join(Editor.Project.path || __dirname, 'extensions');
+            const filePath = path.join(extDir, args.fileName);
+            try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (e) {}
+
+            const profile = Editor.Profile.load('profile://project/mcp-scripts.json', 'mcp-inspector-bridge');
+            const scripts = profile.get('scripts') || {};
+            const key = args.fileName.replace(/\.user\.js$/i, '');
+            delete scripts[key];
+            profile.set('scripts', scripts);
+            profile.save();
+
+            if (event.reply) event.reply(null, { success: true });
+        },
+        'script-list-files'(event: any) {
+            const fs = require('fs');
+            const path = require('path');
+            const extDir = path.join(Editor.Project.path || __dirname, 'extensions');
+            if (!fs.existsSync(extDir)) { if (event.reply) event.reply(null, []); return; }
+            const profile = Editor.Profile.load('profile://project/mcp-scripts.json', 'mcp-inspector-bridge');
+            const scripts = profile.get('scripts') || {};
+            const files = fs.readdirSync(extDir).filter((f: string) => f.endsWith('.user.js'));
+            const result = files.map((f: string) => {
+                const key = f.replace(/\.user\.js$/i, '');
+                return { name: f, enabled: scripts[key]?.enabled !== false };
+            });
+            if (event.reply) event.reply(null, result);
+        },
+        'script-read-file'(event: any, args: { fileName: string }) {
+            const fs = require('fs');
+            const path = require('path');
+            const extDir = path.join(Editor.Project.path || __dirname, 'extensions');
+            const filePath = path.join(extDir, args.fileName);
+            try {
+                const content = fs.readFileSync(filePath, 'utf-8');
+                if (event.reply) event.reply(null, { content });
+            } catch (e: any) {
+                if (event.reply) event.reply(null, { error: e.message });
+            }
+        },
+        'script-import-dialog'(event: any) {
+            const { dialog } = require('electron');
+            const path = require('path');
+            const fs = require('fs');
+            const extDir = path.join(Editor.Project.path || __dirname, 'extensions');
+            if (!fs.existsSync(extDir)) fs.mkdirSync(extDir, { recursive: true });
+
+            dialog.showOpenDialog({
+                title: '导入用户脚本',
+                filters: [{ name: 'UserScript', extensions: ['js'] }],
+                properties: ['openFile'],
+            }).then((result: any) => {
+                if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+                    if (event.reply) event.reply(null, { canceled: true });
+                    return;
+                }
+                const srcPath = result.filePaths[0];
+                const fileName = path.basename(srcPath).replace(/\.js$/i, '.user.js');
+                const destPath = path.join(extDir, fileName);
+                fs.copyFileSync(srcPath, destPath);
+                const content = fs.readFileSync(destPath, 'utf-8');
+                if (event.reply) event.reply(null, { fileName, content });
+            }).catch((e: any) => {
+                if (event.reply) event.reply(null, { error: e.message });
+            });
+        },
+        'script-export-file'(event: any, args: { fileName: string }) {
+            const { dialog } = require('electron');
+            const path = require('path');
+            const fs = require('fs');
+            const extDir = path.join(Editor.Project.path || __dirname, 'extensions');
+            const srcPath = path.join(extDir, args.fileName);
+
+            dialog.showSaveDialog({
+                title: '导出用户脚本',
+                defaultPath: args.fileName,
+                filters: [{ name: 'UserScript', extensions: ['js'] }],
+            }).then((result: any) => {
+                if (result.canceled || !result.filePath) return;
+                try { fs.copyFileSync(srcPath, result.filePath); } catch (_) {}
+            }).catch(() => {});
+        },
+        'script-register-tool'(event: any, toolDef: any) {
+            // 动态 MCP 工具注册预留（面板→主进程）
+            if (event.reply) event.reply(null, { success: true });
+        },
+        'script-unregister-tool'(event: any, name: string) {
+            if (event.reply) event.reply(null, { success: true });
+        },
+
         'query-cdp-logs'(event: any, args: any) {
             // 懒启动 CDP 监听器（首次查询时自动 attach）
             async function handle() {

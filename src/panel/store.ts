@@ -33,5 +33,21 @@ export const globalState = reactive({
     mcpPayload: '' as string,
     mcpScanning: false as boolean,
     mcpInjectLog: '' as string,
-    mcpLogs: [] as Array<{time: string, type: 'req'|'res'|'err', content: string}>
+    mcpLogs: [] as Array<{time: string, type: 'req'|'res'|'err', content: string}>,
+    // 用户脚本系统
+    scriptList: [] as Array<{
+        name: string;
+        version: string;
+        description: string;
+        author: string;
+        grants: string[];
+        status: 'running' | 'stopped' | 'error';
+        errorMsg: string;
+        toolCount: number;
+        installedAt: number;
+        fileName: string;
+    }>,
+    scriptEditorVisible: false as boolean,
+    scriptEditorContent: '' as string,
+    scriptEditorFileName: '' as string,
 });

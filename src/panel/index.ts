@@ -6,6 +6,11 @@ const { createApp, ref, onMounted, watch } = require('vue');
 const { NodeTree } = require('./components/NodeTree');
 const { NodeInspector } = require('./components/NodeInspector');
 const { RenderDebugger } = require('./components/RenderDebugger');
+const { ScriptManager } = require('./components/ScriptManager');
+const { useScriptSystem } = require('./composables/useScriptSystem');
+
+// 模块级引用，供 messages handlers 访问
+let _scriptSystem: any = null;
 
 const templateRaw = fs.readFileSync(path.join(__dirname, '../../src/panel/index.html'), 'utf-8');
 const preloadUrlResolved = 'file:///' + Editor.url('packages://mcp-inspector-bridge/dist/preload.js').replace(/\\/g, '/');
@@ -36,7 +41,7 @@ module.exports = Editor.Panel.extend({
         const panelAppElement = this.$app;
 
         const app = createApp({
-            components: { NodeTree, 'node-inspector': NodeInspector, 'render-debugger': RenderDebugger },
+            components: { NodeTree, 'node-inspector': NodeInspector, 'render-debugger': RenderDebugger, 'script-manager': ScriptManager },
             setup() {
                 const activeTab = ref(0);
                 const wrapperSize = ref({ width: 0, height: 0 });
@@ -64,6 +69,84 @@ module.exports = Editor.Panel.extend({
                 );
 
                 const devToolsSystem = useDevTools(globalState, gameView, devtoolsView, activeTab, layoutSystem.rightPanelWidth);
+
+                // --- 用户脚本系统 ---
+                const registeredScriptTools: Map<string, any> = new Map();
+                const registerMcpToolFn = (toolDef: any) => {
+                    registeredScriptTools.set(toolDef.name, toolDef);
+                    if (typeof Editor !== 'undefined') {
+                        Editor.Ipc.sendToMain('mcp-inspector-bridge:script-register-tool', toolDef);
+                    }
+                };
+                const unregisterMcpToolFn = (name: string) => {
+                    registeredScriptTools.delete(name);
+                    if (typeof Editor !== 'undefined') {
+                        Editor.Ipc.sendToMain('mcp-inspector-bridge:script-unregister-tool', name);
+                    }
+                };
+
+                const scriptSystem = useScriptSystem(globalState, gameView, registerMcpToolFn, unregisterMcpToolFn);
+                _scriptSystem = scriptSystem;
+
+                const openScriptEditor = (fileName?: string, content?: string) => {
+                    globalState.scriptEditorFileName = fileName || '';
+                    globalState.scriptEditorContent = content || `// ==McpScript==
+// @name        新脚本
+// @version     1.0.0
+// @description 脚本描述
+// @author      作者
+// @grant       input_simulation
+// ==/McpScript==
+
+mcp.log('脚本已加载');
+`;
+                    globalState.scriptEditorVisible = true;
+                };
+
+                const saveScriptEditor = () => {
+                    if (!globalState.scriptEditorFileName) {
+                        if (typeof Editor !== 'undefined') Editor.log('[Script] 请先输入文件名');
+                        return;
+                    }
+                    const fn = globalState.scriptEditorFileName.endsWith('.user.js')
+                        ? globalState.scriptEditorFileName
+                        : globalState.scriptEditorFileName + '.user.js';
+
+                    if (typeof Editor !== 'undefined') {
+                        Editor.Ipc.sendToMain('mcp-inspector-bridge:script-save-file',
+                            { fileName: fn, content: globalState.scriptEditorContent },
+                            (err: any) => {
+                                if (!err) scriptSystem.loadScript(fn, globalState.scriptEditorContent);
+                                globalState.scriptEditorVisible = false;
+                            });
+                    } else {
+                        globalState.scriptEditorVisible = false;
+                    }
+                };
+
+                const handleScriptImport = () => {
+                    if (typeof Editor !== 'undefined') {
+                        Editor.Ipc.sendToMain('mcp-inspector-bridge:script-import-dialog', {}, (err: any, result: any) => {
+                            if (result && result.content && !result.canceled) {
+                                scriptSystem.loadScript(result.fileName, result.content);
+                            }
+                        });
+                    }
+                };
+
+                const handleScriptExport = (fileName: string) => {
+                    if (typeof Editor !== 'undefined') {
+                        Editor.Ipc.sendToMain('mcp-inspector-bridge:script-export-file', { fileName });
+                    }
+                };
+
+                const handleScriptDelete = (fileName: string) => {
+                    scriptSystem.removeScript(fileName);
+                    if (typeof Editor !== 'undefined') {
+                        Editor.Ipc.sendToMain('mcp-inspector-bridge:script-delete-file', { fileName });
+                    }
+                };
+                // --- 用户脚本系统结束 ---
 
                 const electron = require('electron');
                 const savedScale = window.localStorage.getItem('mcp-ui-scale');
@@ -154,6 +237,30 @@ module.exports = Editor.Panel.extend({
                         
                         refreshMcpClients();
                         fetchMcpPayload();
+
+                        // 恢复已安装的用户脚本
+                        Editor.Ipc.sendToMain('mcp-inspector-bridge:script-list-files', {}, (e3: any, files: any[]) => {
+                            if (files && Array.isArray(files)) {
+                                let loaded = 0;
+                                for (const f of files) {
+                                    Editor.Ipc.sendToMain('mcp-inspector-bridge:script-read-file',
+                                        { fileName: f.name },
+                                        (e4: any, data: any) => {
+                                            if (data && data.content) {
+                                                scriptSystem.loadScript(f.name, data.content);
+                                                if (!f.enabled) {
+                                                    scriptSystem.disableScript(f.name);
+                                                }
+                                            }
+                                            loaded++;
+                                            if (loaded >= files.length) {
+                                                scriptSystem.syncToState();
+                                            }
+                                        });
+                                }
+                                if (files.length === 0) scriptSystem.syncToState();
+                            }
+                        });
                     }
                 });
 
@@ -490,7 +597,15 @@ module.exports = Editor.Panel.extend({
                     copyMcpPayload,
                     copyMcpPath,
                     copyMcpLogs,
-                    
+
+                    scriptSystem,
+                    openScriptEditor,
+                    saveScriptEditor,
+                    handleScriptImport,
+                    handleScriptExport,
+                    handleScriptDelete,
+                    registeredScriptTools,
+
                     ...layoutSystem,
                     ...tabSystem,
                     ...gameViewSystem,
@@ -671,7 +786,64 @@ module.exports = Editor.Panel.extend({
         },
         'mcp-status-changed'(event: any, payload: any) {
             window.dispatchEvent(new CustomEvent('mcp-status-changed', { detail: payload }));
-        }
+        },
+        'mcp-script-install'(this: any, event: any, args: { name: string; code: string }) {
+            const fn = args.name.endsWith('.user.js') ? args.name : args.name + '.user.js';
+            if (typeof Editor !== 'undefined') {
+                Editor.Ipc.sendToMain('mcp-inspector-bridge:script-save-file',
+                    { fileName: fn, content: args.code },
+                    () => {
+                        const result = _scriptSystem ? _scriptSystem.loadScript(fn, args.code) : { success: false, error: '脚本系统未初始化' };
+                        if (event.reply) event.reply(null, {
+                            success: result.success,
+                            message: result.success ? '脚本已安装并启用' : ('安装失败: ' + result.error),
+                        });
+                    });
+            } else {
+                const result = _scriptSystem ? _scriptSystem.loadScript(fn, args.code) : { success: false, error: '脚本系统未初始化' };
+                if (event.reply) event.reply(null, {
+                    success: result.success,
+                    message: result.success ? '脚本已安装并启用' : ('安装失败: ' + result.error),
+                });
+            }
+        },
+        'mcp-script-enable'(this: any, event: any, args: { name: string }) {
+            const fn = args.name.endsWith('.user.js') ? args.name : args.name + '.user.js';
+            if (typeof Editor !== 'undefined') {
+                Editor.Ipc.sendToMain('mcp-inspector-bridge:script-read-file',
+                    { fileName: fn },
+                    (err: any, data: any) => {
+                        if (data && data.content && _scriptSystem) {
+                            const result = _scriptSystem.enableScript(fn, data.content);
+                            if (event.reply) event.reply(null, {
+                                success: result.success,
+                                message: result.success ? '脚本已启用' : ('启用失败: ' + result.error),
+                            });
+                        } else {
+                            if (event.reply) event.reply(null, { success: false, message: '脚本文件不存在: ' + fn });
+                        }
+                    });
+            }
+        },
+        'mcp-script-disable'(this: any, event: any, args: { name: string }) {
+            const fn = args.name.endsWith('.user.js') ? args.name : args.name + '.user.js';
+            if (_scriptSystem) _scriptSystem.disableScript(fn);
+            if (event.reply) event.reply(null, { success: true, message: '脚本已停用' });
+        },
+        'mcp-script-list'(this: any, event: any) {
+            if (event.reply) event.reply(null, {
+                scripts: globalState.scriptList.map((s: any) => ({
+                    name: s.name,
+                    fileName: s.fileName,
+                    version: s.version,
+                    description: s.description,
+                    author: s.author,
+                    status: s.status,
+                    grants: s.grants,
+                    toolCount: s.toolCount,
+                })),
+            });
+        },
     },
 
     show() {

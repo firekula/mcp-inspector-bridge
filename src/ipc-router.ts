@@ -10,7 +10,11 @@ const TOOL_IPC_MAP: Record<string, string> = {
     'simulate_input': 'mcp-simulate-input',
     'get_node_tree': 'mcp-query-tree',
     'get_runtime_logs': 'mcp-query-logs',
-    'get_runtime_stats': 'mcp-query-stats'
+    'get_runtime_stats': 'mcp-query-stats',
+    'install_script': 'mcp-script-install',
+    'enable_script': 'mcp-script-enable',
+    'disable_script': 'mcp-script-disable',
+    'list_scripts': 'mcp-script-list',
 };
 
 const CACHE: Record<string, { timestamp: number, data: any }> = {};

@@ -113,7 +113,42 @@ export function setupTools(server: Server, sendRpcToCocos: (method: string, args
                     name: "get_runtime_stats",
                     description: "Get current game runtime performance stats including FPS, DrawCall and CPU logic/render times.",
                     inputSchema: { type: "object", properties: {}, required: [] },
-                }
+                },
+                {
+                    name: "install_script",
+                    description: "安装或更新用户脚本。传入完整脚本内容（含 // ==McpScript== 元数据块）。脚本将获得声明的 @grant 权限并立即启用。",
+                    inputSchema: {
+                        type: "object",
+                        properties: {
+                            name: { type: "string", description: "脚本文件名，如 my-script.user.js" },
+                            code: { type: "string", description: "脚本完整内容（包含 // ==McpScript== 元数据头部）" }
+                        },
+                        required: ["name", "code"]
+                    },
+                },
+                {
+                    name: "enable_script",
+                    description: "启用一个已安装的脚本，恢复其 MCP 工具和定时器。",
+                    inputSchema: {
+                        type: "object",
+                        properties: { name: { type: "string", description: "脚本文件名" } },
+                        required: ["name"]
+                    },
+                },
+                {
+                    name: "disable_script",
+                    description: "停用一个正在运行的脚本，注销其 MCP 工具并清除定时器。",
+                    inputSchema: {
+                        type: "object",
+                        properties: { name: { type: "string", description: "脚本文件名" } },
+                        required: ["name"]
+                    },
+                },
+                {
+                    name: "list_scripts",
+                    description: "列出所有已安装的用户脚本及其运行状态。",
+                    inputSchema: { type: "object", properties: {}, required: [] },
+                },
             ],
         };
     });

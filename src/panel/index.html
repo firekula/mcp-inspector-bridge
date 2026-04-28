@@ -839,8 +839,35 @@
                     </details>
                 </div>
             </div>
-            <div v-show="activeTab === 3" style="position: absolute; inset: 0; padding: 15px;">
-                <h4>第三方扩展</h4>
+            <!-- Tab 3: 用户脚本 -->
+            <div v-show="activeTab === 3" style="position: absolute; inset: 0; padding: 15px; overflow-y: auto; background: #1a1a1a;">
+                <script-manager
+                    :script-list="globalState.scriptList"
+                    @new-script="openScriptEditor()"
+                    @import-script="handleScriptImport"
+                    @enable-script="(fileName) => { if (typeof Editor !== 'undefined') Editor.Ipc.sendToMain('mcp-inspector-bridge:script-read-file', {fileName}, (err, data) => { if(data && data.content) scriptSystem.enableScript(fileName, data.content); }); }"
+                    @disable-script="scriptSystem.disableScript"
+                    @edit-script="(fileName) => { if (typeof Editor !== 'undefined') Editor.Ipc.sendToMain('mcp-inspector-bridge:script-read-file', {fileName}, (err, data) => { if(data && data.content) openScriptEditor(fileName, data.content); }); }"
+                    @export-script="handleScriptExport"
+                    @delete-script="handleScriptDelete">
+                </script-manager>
+
+                <!-- 脚本编辑器模态框 -->
+                <div v-if="globalState.scriptEditorVisible" style="position: fixed; inset: 0; z-index: 10000; display: flex; justify-content: center; align-items: center; background: rgba(0,0,0,0.8);">
+                    <div style="width: 80%; height: 80%; background: #1e1e1e; border: 2px solid #555; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: #333; border-bottom: 1px solid #555;">
+                            <div style="color: #e0e0e0; font-weight: bold;">编辑脚本</div>
+                            <div style="display: flex; gap: 10px;">
+                                <input v-model="globalState.scriptEditorFileName" placeholder="文件名.user.js"
+                                    style="background: #111; color: #eee; border: 1px solid #555; padding: 4px 8px; border-radius: 3px; width: 200px;">
+                                <button class="icon-btn" style="width: auto; padding: 4px 15px; color: #4caf50;" @click="saveScriptEditor">保存</button>
+                                <button class="icon-btn" style="width: auto; padding: 4px 15px;" @click="globalState.scriptEditorVisible = false">取消</button>
+                            </div>
+                        </div>
+                        <textarea v-model="globalState.scriptEditorContent"
+                            style="flex: 1; background: #111; color: #4caf50; border: none; padding: 15px; font-family: 'Consolas', 'Courier New', monospace; font-size: 13px; resize: none; outline: none; tab-size: 4;"></textarea>
+                    </div>
+                </div>
             </div>
 
             <!-- Tab 4: 性能分析 (Phase 1 Barebones) -->
