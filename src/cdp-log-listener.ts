@@ -1,15 +1,17 @@
 /**
  * 运行时日志监听器 (Runtime Log Listener)
- * 
- * 采用 Hybrid 策略：
+ *
+ * 采用 Hybrid 三层策略：
  *   1. 主进程尝试注册 console-message 事件（对 BrowserView 类型有效）
- *   2. 对 <webview> 类型：通过 executeJavaScript 注入捕获脚本到页面内部，
- *      拦截 console.* 写入 window.__mcpLogBuffer，查询时轮询读取
- * 
- * 为什么需要注入？
- *   Electron <webview> 运行在独立渲染进程中，其 console 输出不会触发
- *   主进程的 console-message 事件，也不会派发 CDP Runtime 事件。
- *   唯一可靠的方式是在页面进程内部拦截。
+ *   2. 对 <webview> 类型：优先 CDP debugger 附加监听 Runtime.consoleAPICalled
+ *      （零注入，完美保留 DevTools 源归属）
+ *   3. CDP 不可用时降级：通过 executeJavaScript 注入 Proxy 包装脚本
+ *
+ * 为什么需要 CDP 优先？
+ *   Electron <webview> 的 console 输出不触发主进程 console-message 事件。
+ *   之前唯一的方案是注入 Proxy 包装脚本，但这会导致 DevTools 中所有日志
+ *   的源归属显示为注入脚本（mcp-log-capture.js），无法定位真实调用位置。
+ *   CDP Runtime.consoleAPICalled 事件自带正确的 stackTrace，无需任何注入。
  */
 declare const Editor: any;
 
@@ -31,13 +33,47 @@ let buffer: CdpLogEntry[] = [];
 let targetWC: any = null;
 let listening = false;
 let _useInjection = false; // ★ 是否使用了注入模式（webview 场景）
+let _useCdp = false;      // ★ 是否使用 CDP debugger 模式（webview 场景优先）
 let _eventCount = 0;
+const CDP_PROTOCOL_VERSION = '1.3';
 
 /** 将日志条目推入 RingBuffer（自动截断到 MAX_BUFFER 上限） */
 function push(e: CdpLogEntry): void {
     _eventCount++;
     buffer.push(e);
     if (buffer.length > MAX_BUFFER) buffer.shift();
+}
+
+/** 将 CDP Runtime.consoleAPICalled 事件的 args (RemoteObject[]) 解析为可读字符串 */
+function parseCdpArgs(args: any[]): string {
+    return args.map((a: any) => {
+        if (a.type === 'string' && a.value !== undefined) return a.value;
+        if (a.type === 'undefined') return 'undefined';
+        if (a.type === 'null' || a.value === null) return 'null';
+        if (a.type === 'number' || a.type === 'boolean') return String(a.value);
+        if (a.type === 'object' && a.description) return a.description;
+        if (a.type === 'function' && a.description) return a.description;
+        if (a.value !== undefined) return String(a.value);
+        return a.description || `[${a.type}]`;
+    }).join(' ');
+}
+
+/** 处理 CDP Runtime.consoleAPICalled 事件，转为 CdpLogEntry 并推入 buffer */
+function handleCdpConsoleEvent(params: any): void {
+    const rawType = params.type || 'log';
+    const type = rawType === 'warning' ? 'warn' : rawType;
+    const message = parseCdpArgs(params.args || []).slice(0, MAX_MSG_LEN);
+    const firstFrame = params.stackTrace?.callFrames?.[0];
+
+    push({
+        type,
+        timestamp: params.timestamp || Date.now(),
+        message,
+        args: [],
+        url: firstFrame?.url,
+        line: firstFrame?.lineNumber,
+        column: firstFrame?.columnNumber,
+    });
 }
 
 /**
@@ -181,27 +217,55 @@ export async function initCdpLogListener(silent = false): Promise<boolean> {
         const wcType = game.getType?.() || 'unknown';
 
         if (wcType === 'webview') {
-            // ★ Webview 模式：注入捕获脚本 + 轮询读取
-            _useInjection = true;
-            
-            if (!silent) Editor.log('[CDP Log] 检测到 webview 类型，使用注入式日志捕获...');
-            
-            await game.executeJavaScript(INJECTION_SCRIPT);
-            
-            // 验证注入是否生效
-            await new Promise<void>((resolve) => setTimeout(resolve, 200));
-            
-            const testResult: any = await game.executeJavaScript(`
-                JSON.stringify({
-                    injected: !!window.__mcpLogInjected,
-                    bufferSize: window.__mcpLogBuffer ? window.__mcpLogBuffer.length : -1,
-                    firstEntry: (window.__mcpLogBuffer && window.__mcpLogBuffer.length > 0) 
-                        ? window.__mcpLogBuffer[0] : null
-                })
-            `);
-            
-            if (!silent) Editor.log(`[CDP Log] 注入验证结果: ${testResult}`);
-            
+            // ★ Webview 模式: CDP debugger 优先 + 注入降级
+            try {
+                // 尝试通过 CDP debugger 附加（零侵入，无源归属问题）
+                if (!silent) Editor.log('[CDP Log] 尝试 CDP debugger 附加到 webview...');
+
+                (game as any).debugger.attach(CDP_PROTOCOL_VERSION);
+                await (game as any).debugger.sendCommand('Runtime.enable');
+
+                // 注册 CDP 事件监听
+                (game as any).debugger.on('message', (_ev: any, method: string, params: any) => {
+                    if (method === 'Runtime.consoleAPICalled') {
+                        handleCdpConsoleEvent(params);
+                    }
+                });
+
+                // 监听 debugger 被外部 detach（如用户打开 DevTools）
+                (game as any).debugger.on('detach', (_ev: any, reason: string) => {
+                    if (!silent) Editor.log(`[CDP Log] Debugger 被外部 detach (${reason})，降级到注入方案`);
+                    _useCdp = false;
+                    _useInjection = true;
+                    // 尝试注入作为补救
+                    game.executeJavaScript(INJECTION_SCRIPT).catch(() => {});
+                });
+
+                _useCdp = true;
+                _useInjection = false;
+                if (!silent) Editor.log('[CDP Log] ✓ CDP debugger 附加成功，使用 Runtime.consoleAPICalled 监听日志');
+            } catch (e: any) {
+                // CDP 附加失败（如 DevTools 已占用），降级到注入方案
+                if (!silent) Editor.log(`[CDP Log] Debugger 附加失败 (${e.message})，降级到注入方案`);
+
+                try {
+                    await game.executeJavaScript(INJECTION_SCRIPT);
+                    _useCdp = false;
+                    _useInjection = true;
+
+                    // 验证注入是否生效
+                    await new Promise<void>((resolve) => setTimeout(resolve, 200));
+                    const testResult: any = await game.executeJavaScript(`
+                        JSON.stringify({
+                            injected: !!window.__mcpLogInjected,
+                            bufferSize: window.__mcpLogBuffer ? window.__mcpLogBuffer.length : -1
+                        })
+                    `);
+                    if (!silent) Editor.log(`[CDP Log] 注入降级验证结果: ${testResult}`);
+                } catch (injErr: any) {
+                    if (!silent) Editor.error('[CDP Log] 注入降级也失败了:', injErr.message);
+                }
+            }
         } else {
             // ★ 非 Webview 模式：使用原生 console-message 事件
             _useInjection = false;
@@ -219,19 +283,21 @@ export async function initCdpLogListener(silent = false): Promise<boolean> {
         }
 
         game.once('destroyed', () => {
-            Editor.log('[CDP Log] 目标 WebContents 已销毁');
+            if (!silent) Editor.log('[CDP Log] 目标 WebContents 已销毁');
             listening = false;
             targetWC = null;
             _useInjection = false;
+            _useCdp = false;
         });
 
         listening = true;
-        if (!silent) Editor.log(`[CDP Log] ✓ 初始化完成 (mode=${_useInjection ? 'injection' : 'native-event'})`);
+        if (!silent) Editor.log(`[CDP Log] ✓ 初始化完成 (mode=${_useCdp ? 'cdp-debugger' : (_useInjection ? 'injection' : 'native-event')})`);
         return true;
     } catch (e: any) {
         listening = false;
         targetWC = null;
         _useInjection = false;
+        _useCdp = false;
         if (!silent) Editor.error('[CDP Log] initCdpLogListener 失败:', e.message || e);
         return false;
     }
@@ -245,7 +311,7 @@ export async function initCdpLogListener(silent = false): Promise<boolean> {
  */
 export async function getCdpLogs(tail = 50, level = 'all'): Promise<CdpLogEntry[]> {
     // 如果是注入模式，先从 webview 轮询最新数据
-    if (_useInjection && targetWC && !targetWC.isDestroyed?.()) {
+    if (_useInjection && !_useCdp && targetWC && !targetWC.isDestroyed?.()) {
         try {
             const raw: any = await targetWC.executeJavaScript(`
                 (function() {
@@ -285,20 +351,33 @@ export async function getCdpLogs(tail = 50, level = 'all'): Promise<CdpLogEntry[
 }
 
 /** 获取当前连接状态和缓冲区大小 */
-export function getCdpStatus(): { attached: boolean; size: number; method: string; eventCount: number; injection: boolean } {
-    return { 
-        attached: listening, 
-        size: buffer.length, 
-        method: _useInjection ? 'webview-injection' : 'native-event', 
+export function getCdpStatus(): { attached: boolean; size: number; method: string; eventCount: number; injection: boolean; cdp: boolean } {
+    let method = 'native-event';
+    if (_useCdp) method = 'cdp-debugger';
+    else if (_useInjection) method = 'webview-injection';
+
+    return {
+        attached: listening,
+        size: buffer.length,
+        method,
         eventCount: _eventCount,
-        injection: _useInjection 
+        injection: _useInjection,
+        cdp: _useCdp,
     };
 }
 
 /** 断开并清空 */
 export function detachCdpListener(): void {
+    if (_useCdp && targetWC && !targetWC.isDestroyed?.()) {
+        try {
+            (targetWC as any).debugger.detach();
+        } catch (_) {
+            // debugger 可能已被外部 detach，忽略错误
+        }
+    }
     targetWC = null;
     listening = false;
     _useInjection = false;
+    _useCdp = false;
     buffer = [];
 }

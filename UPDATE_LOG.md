@@ -4,6 +4,19 @@
 
 ---
 
+## [Unreleased] - 2026-04-28
+
+### 🐛 缺陷修复
+
+- **Webview 日志捕获迁移至 CDP 协议 — 根治 DevTools 源归属错乱**: 彻底解决了 webview 模式下所有控制台日志在 DevTools 中均显示来源为 `mcp-log-capture.js` 而无法定位真实调用位置的问题。
+  - **根因**: 之前对 webview 采用 `executeJavaScript` 注入 Proxy 包装 `console.*` 的方案，所有 `console.log` 实际调用发生在注入脚本的 Proxy `apply` 陷阱内部，Chromium 将此作为日志来源归因。
+  - **方案**: 改为优先使用 `webContents.debugger.attach()` + CDP `Runtime.consoleAPICalled` 事件被动监听。CDP 事件自带正确的 `stackTrace.callFrames`，日志源 URL/行号/列号指向游戏代码真实位置，无需任何页面内注入。
+  - **降级保护**: CDP debugger 附加失败时（如用户已打开 DevTools 调试游戏），自动降级到原有注入方案，确保日志采集不中断。
+  - **零破坏性**: 仅修改 `src/cdp-log-listener.ts` 一个文件，外部接口 `getCdpLogs()` / `getCdpStatus()` / `detachCdpListener()` 签名与行为完全不变。
+  - MCP `get_runtime_logs` 工具返回的 `url`/`line`/`column` 字段现指向真实游戏源文件，日志溯源能力显著提升。
+
+---
+
 ## [Unreleased] - 2026-04-20
 
 ### ✨ 新特性
