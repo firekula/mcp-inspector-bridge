@@ -1,4 +1,5 @@
-module.exports = {
+// @ts-ignore
+export const ScriptManager = {
     name: 'ScriptManager',
     props: { scriptList: { type: Array, default: () => [] } },
     emits: ['new-script', 'import-script', 'enable-script', 'disable-script', 'edit-script', 'export-script', 'delete-script'],
