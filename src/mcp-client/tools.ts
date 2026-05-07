@@ -149,6 +149,11 @@ export function setupTools(server: Server, sendRpcToCocos: (method: string, args
                     description: "列出所有已安装的用户脚本及其运行状态。",
                     inputSchema: { type: "object", properties: {}, required: [] },
                 },
+                {
+                    name: "refresh_preview",
+                    description: "主动刷新 Cocos Creator 游戏预览窗口，使最新代码和资源在预览中生效。用于用户关闭自动刷新或预览未及时更新时调用。",
+                    inputSchema: { type: "object", properties: {}, required: [] },
+                },
             ],
         };
     });

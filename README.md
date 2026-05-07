@@ -68,7 +68,7 @@ npm run build
 - **多实例动态寻址 (Multi-Instance Support)**：内置 `EADDRINUSE` 冲突递增机制，支持同时开启多个编辑器实例，实现不同项目端口的自动隔离（默认 4456）。
 - **基于项目身份的握手协议**：心跳回执注入 `projectName` 与 `projectPath`，允许 AI 快速识别目标平行宇宙。
 - **多端全平台自动配置**：支持向 22 款主流 AI 客户端（如 Claude Desktop、Cursor 等）进行自动探测与免配桥接。
-- **MCP 路由工具扩展**：提供 `get_active_instances` 扫描活跃端口及 `set_active_instance` 绑定指定项目端口。
+- **MCP 路由工具扩展**：提供 `get_active_instances` 扫描活跃端口、`set_active_instance` 绑定指定项目端口、以及 `refresh_preview` 主动刷新游戏预览窗口。
 - **环境安全异常零漏截获 (Eager Log Capture)**：针对 Webview 预览采用 CDP `Runtime.consoleAPICalled` 零注入被动监听（非侵入式，完美保留 DevTools 源归属）；针对 BrowserView 采用原生 `console-message` 事件。双重防御配合每秒后台激进式探测定时器，在游戏初始化第一帧即接管日志，彻底杜绝早期生命周期错误丢失。CDP 不可用时自动降级至注入方案。
 - **超保真渲染验证实况图**：直接为大语言模型一键注入运行时截图，打破次元壁。
 - **可视化 MCP 通信降维打击 (Debug Console)**：在偏好设置面板内置专属通信日志流，实时抓取前后端请求细节与返回结构；更具备极致的数据防爆护城河（自动截断长字符串与双峰队首淘汰流控机制），轻松排查大语言建模幻觉与传输丢包。

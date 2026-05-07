@@ -15,6 +15,7 @@ const TOOL_IPC_MAP: Record<string, string> = {
     'enable_script': 'mcp-script-enable',
     'disable_script': 'mcp-script-disable',
     'list_scripts': 'mcp-script-list',
+    'refresh_preview': 'mcp-refresh-preview',
 };
 
 const CACHE: Record<string, { timestamp: number, data: any }> = {};

@@ -11,6 +11,7 @@ const { useScriptSystem } = require('./composables/useScriptSystem');
 
 // 模块级引用，供 messages handlers 访问
 let _scriptSystem: any = null;
+let _refreshGameFn: (() => void) | null = null;
 
 const templateRaw = fs.readFileSync(path.join(__dirname, '../../src/panel/index.html'), 'utf-8');
 const preloadUrlResolved = 'file:///' + Editor.url('packages://mcp-inspector-bridge/dist/preload.js').replace(/\\/g, '/');
@@ -114,6 +115,8 @@ module.exports = Editor.Panel.extend({
 
                 const scriptSystem = useScriptSystem(globalState, gameView, registerMcpToolFn, unregisterMcpToolFn);
                 _scriptSystem = scriptSystem;
+
+                _refreshGameFn = gameViewSystem.refreshGame;
 
                 const openScriptEditor = (fileName?: string, content?: string) => {
                     globalState.scriptEditorFileName = fileName || '';
@@ -1067,6 +1070,22 @@ mcp.log('脚本已加载');
                     toolCount: s.toolCount,
                 })),
             });
+        },
+        'mcp-refresh-preview'(this: any, event: any) {
+            if (!_refreshGameFn) {
+                if (event.reply) event.reply(null, { success: false, message: "刷新函数未初始化，面板可能尚未加载完成" });
+                return;
+            }
+            if (!globalState.isEditorSceneActive) {
+                if (event.reply) event.reply(null, { success: false, message: "场景编辑器未激活，无法刷新预览" });
+                return;
+            }
+            try {
+                _refreshGameFn();
+                if (event.reply) event.reply(null, { success: true, message: "预览已刷新" });
+            } catch (e: any) {
+                if (event.reply) event.reply(null, { success: false, message: "刷新失败: " + e.message });
+            }
         },
     },
 

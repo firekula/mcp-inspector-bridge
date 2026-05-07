@@ -8,6 +8,11 @@
 
 ### ✨ 新特性
 
+- **MCP `refresh_preview` 工具**: 新增 MCP 工具供 AI 主动刷新游戏预览窗口，解决用户关闭预览面板或脚本修改后热更新未生效时 AI 无法自主刷新的痛点。
+  - **工具名**: `refresh_preview`，无参数，返回 `{ success: boolean, message: string }`。
+  - **守卫机制**: 复用 `refreshGame()` 的场景激活检查、防黑屏挂起、状态重置等全部守卫逻辑。场景未激活时返回友好提示而非报错。
+  - **实现方式**: 遵循现有 MCP 三层架构（tools.ts → ipc-router.ts → panel/index.ts），仅 ~30 行增量，不改动 WebSocket/IPC/探针等核心通道。
+
 - **预览区域性能数据叠加框 (Preview Performance Overlay)**: 在游戏预览区左上角新增半透明 Vue 渲染的性能数据叠加框，彻底取代引擎内置 `cc.debug.setDisplayStats()` 在高分辨率下无法辨认的痛点。
   - **显示内容**: 瞬时 FPS、平均帧率 (Avg)、1% Low FPS、0.1% Low FPS、DrawCall、Logic/Render 耗时、内存占用 (Mem)、场景节点总数 (Nodes)。
   - **帧率分位统计**: 基于 600 帧环形缓冲区逐帧记录帧间隔，实时计算 P99/P99.9 百分位帧率，精准反映卡顿体验。
