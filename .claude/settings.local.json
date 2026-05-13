@@ -14,7 +14,27 @@
       "Bash(mv .claude/skills/spec/define.md .claude/skills/spec-define.md)",
       "Bash(mv .claude/skills/spec/architect.md .claude/skills/spec-architect.md)",
       "Bash(mv .claude/skills/spec/execute.md .claude/skills/spec-execute.md)",
-      "Bash(mv .claude/skills/spec/refactor.md .claude/skills/spec-refactor.md)"
+      "Bash(mv .claude/skills/spec/refactor.md .claude/skills/spec-refactor.md)",
+      "Bash(Get-ChildItem -Path \"dist/panel/composables/useNodeSystem.js\", \"dist/panel/composables/useGameView.js\", \"dist/panel/index.js\")",
+      "Bash(Select-Object Name, LastWriteTime, Length)",
+      "mcp__cocos-inspector-bridge__ping",
+      "mcp__cocos-inspector-bridge__get_node_tree",
+      "mcp__cocos-inspector-bridge__get_selected_node",
+      "mcp__cocos-inspector-bridge__get_node_detail",
+      "mcp__cocos-inspector-bridge__capture_runtime_screenshot",
+      "PowerShell(if \\(-not \\(Test-Path \"C:\\\\Users\\\\Firekula\\\\.CocosCreator\\\\packages\\\\mcp-inspector-bridge\\\\specs\"\\)\\) { Write-Output \"specs directory does not exist\" } else { Get-ChildItem \"C:\\\\Users\\\\Firekula\\\\.CocosCreator\\\\packages\\\\mcp-inspector-bridge\\\\specs\" })",
+      "Bash(npx tsc *)",
+      "Bash(npx esbuild *)",
+      "Bash(git filter-branch *)",
+      "Bash(git stash *)",
+      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --msg-filter \"sed '/^Co-Authored-By:/d'\" 5b7f5ea..HEAD)",
+      "Bash(Get-ChildItem -Recurse -Depth 2)",
+      "Bash(Select-Object Mode, LastWriteTime, Length, Name)",
+      "Bash(Format-Table -AutoSize)",
+      "mcp__cocos-inspector-bridge__refresh_preview",
+      "mcp__cocos-inspector-bridge__list_scripts",
+      "Bash(git check-ignore *)",
+      "Bash(git commit *)"
     ]
   }
 }
