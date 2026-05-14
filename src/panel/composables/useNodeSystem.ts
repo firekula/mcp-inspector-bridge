@@ -150,11 +150,13 @@ export function useNodeSystem(globalState: any, gameView: any, nodeTreeRef: any,
         const wv: any = gameView.value;
         if (isWebViewReady(wv)) {
             const { uuid, compName, propKey, value, compIndex, arrayIndex } = payload;
-            let valStr = value;
+            let valStr: string;
             if (typeof value === 'string') {
-                valStr = '"' + value.replace(/"/g, '\\"') + '"';
+                valStr = JSON.stringify(value);
             } else if (typeof value === 'object' && value !== null) {
                 valStr = JSON.stringify(value);
+            } else {
+                valStr = String(value);
             }
             const compStr = compName ? '"' + compName + '"' : 'null';
             const arrIdxStr = arrayIndex !== undefined ? arrayIndex : -1;
@@ -335,6 +337,7 @@ export function useNodeSystem(globalState: any, gameView: any, nodeTreeRef: any,
             if (autoRefreshPaused) return;
             // 前置拦截：如果在悬停 inspector 面板、未选中节点或者当前选项卡并非游戏视图场景，放弃请求
             if (globalState.isInspectorHovered) return;
+            if (globalState.isInspectorFocused) return;
             if (!globalState.nodeDetail || !globalState.nodeDetail.id) return;
             if (activeTab && activeTab.value !== 0) return;
 

@@ -414,6 +414,30 @@
         border-color: var(--accent-blue);
     }
 
+    .prop-val textarea.prop-string-textarea {
+        width: 100%; box-sizing: border-box;
+        padding: 2px 4px;
+        background: var(--bg-input);
+        color: var(--text-main);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        min-width: 0;
+        outline: none;
+        resize: none;
+        overflow: hidden;
+        font-family: inherit;
+        font-size: inherit;
+        line-height: 1.5;
+        min-height: 22px;
+    }
+    .prop-val textarea.prop-string-textarea:focus {
+        border-color: var(--accent-blue);
+    }
+    .array-item-textarea {
+        color: #ff9800 !important;
+        font-size: 11px !important;
+    }
+
     .asset-link {
         width: 100%;
         height: 22px;
@@ -644,7 +668,7 @@
                     <div
                         style="flex: 1; overflow-y: auto; background: var(--bg-main); min-width: 0; min-height: 0; position: relative; padding: 10px;">
                         <node-inspector :node-detail="globalState.nodeDetail" @update-prop="onUpdateNodeProp"
-                            @hover-change="globalState.isInspectorHovered = $event" @locate-node="onLocateNode"
+                            @hover-change="globalState.isInspectorHovered = $event" @focus-change="globalState.isInspectorFocused = $event" @locate-node="onLocateNode"
                             @locate-asset="onLocateAsset" @print-comp="onPrintComp"
                             @print-node="onPrintNode"></node-inspector>
                         <div v-show="isNodeTreeDragging" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 99;"></div>

@@ -11,6 +11,7 @@ export const NodeInspector = {
   emits: [
     "update-prop",
     "hover-change",
+    "focus-change",
     "locate-node",
     "locate-asset",
     "print-comp",
@@ -18,7 +19,8 @@ export const NodeInspector = {
   ],
   template: `
         <div class="node-inspector-wrap" style="padding: 10px; overflow-y: auto; height: 100%; color: #d0d0d0;"
-             @mouseenter="onHover(true)" @mouseleave="onHover(false)">
+             @mouseenter="onHover(true)" @mouseleave="onHover(false)"
+             @focusin="onFocusChange(true)" @focusout="onFocusChange(false)">
 
             <div v-if="!nodeDetail" class="empty-hint" style="text-align: center; margin-top: 50px; color: #888;">
                 未选中任何节点 (No node selected)
@@ -179,7 +181,7 @@ export const NodeInspector = {
                                             <select v-if="prop.enumList" :value="prop.value || '<None>'" @change="onUpdateProp(comp.name, prop.key, $event.target.value === '<None>' ? '' : $event.target.value, comp.realIndex)">
                                                 <option v-for="opt in prop.enumList" :key="opt" :value="opt">{{ opt }}</option>
                                             </select>
-                                            <input v-else type="text" :value="prop.value" @change="onUpdateProp(comp.name, prop.key, $event.target.value, comp.realIndex)" />
+                                            <textarea v-else :value="prop.value" @change="onUpdateProp(comp.name, prop.key, $event.target.value, comp.realIndex)" rows="1" class="prop-string-textarea"></textarea>
                                         </template>
                                         
                                         <!-- Node Ref -->
@@ -283,7 +285,7 @@ export const NodeInspector = {
                                             </template>
 
                                             <template v-else-if="typeof item === 'string'">
-                                                <input type="text" :value="item" @change="onUpdateProp(comp.name, prop.key, $event.target.value, comp.realIndex, idx)" style="flex: 1; min-width: 0; background: var(--bg-input); color: #ff9800; border: 1px solid var(--border-color); border-radius: var(--radius); font-size: 11px; padding: 2px 6px;" :title="item"/>
+                                                <textarea :value="item" @change="onUpdateProp(comp.name, prop.key, $event.target.value, comp.realIndex, idx)" rows="1" class="prop-string-textarea array-item-textarea" :title="item"></textarea>
                                             </template>
 
                                             <template v-else>
@@ -406,6 +408,10 @@ export const NodeInspector = {
       emit("hover-change", hovering);
     };
 
+    const onFocusChange = (focused: boolean) => {
+      emit("focus-change", focused);
+    };
+
     const formatNumber = (val: number | string | undefined) => {
       if (val === undefined || val === null) return 0;
       const res = parseFloat(val as string);
@@ -435,6 +441,7 @@ export const NodeInspector = {
       toggleComp,
       onUpdateProp,
       onHover,
+      onFocusChange,
       formatNumber,
       onLocateNodeRef,
       onLocateAssetRef,

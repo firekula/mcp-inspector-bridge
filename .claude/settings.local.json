@@ -34,7 +34,9 @@
       "mcp__cocos-inspector-bridge__refresh_preview",
       "mcp__cocos-inspector-bridge__list_scripts",
       "Bash(git check-ignore *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(Get-ChildItem -Path \".\" -Directory -Recurse -Depth 2)",
+      "Bash(Select-Object FullName)"
     ]
   }
 }

@@ -4,6 +4,31 @@
 
 ---
 
+## [0.1.6] - 2026-05-14
+
+### ✨ 新特性
+
+- **属性编辑器 string 属性支持换行编辑 (Multiline string property editing)**
+    - `NodeInspector` 中 string 类型属性由 `<input>` 替换为 `<textarea>`，支持 Enter 键插入换行
+    - 覆盖组件属性行和数组内 string 项两处渲染位置
+    - 新增 `prop-string-textarea` CSS 类，保持与原有 input 一致的外观
+
+### 🐛 缺陷修复
+
+- **修复 Label/RichText 组件 string 属性无法换行编辑**
+    - **问题**：属性编辑器使用 `<input type="text">` 渲染 string 属性，Enter 键无法插入换行符 `\n`
+    - **方案**：将 `<input>` 替换为 `<textarea rows="1">`，复用现有 `@change` 事件机制，无需修改数据流逻辑
+
+- **修复属性编辑器自动刷新覆盖用户编辑内容**
+    - **问题**：500ms 自动刷新定时器在用户编辑属性时持续覆盖 `globalState.nodeDetail`，导致 textarea 输入被刷新数据冲掉
+    - **方案**：新增 `isInspectorFocused` 全局状态，利用 `focusin`/`focusout` DOM 冒泡事件追踪属性编辑器焦点，焦点在内时暂停自动刷新
+
+- **修复含换行符的 string 属性更新抛出 SyntaxError**
+    - **问题**：`onUpdateNodeProp` 中仅转义双引号，未处理 `\n`、`\r` 等特殊字符，导致 `executeJavaScript` 注入的代码字符串跨行
+    - **方案**：统一使用 `JSON.stringify(value)` 替代手动 `replace(/"/g, '\\"')`，原生处理所有特殊字符转义
+
+---
+
 ## [Unreleased] - 2026-05-07
 
 ### ✨ 新特性

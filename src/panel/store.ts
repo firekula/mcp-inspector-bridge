@@ -21,6 +21,7 @@ export const globalState = reactive({
         batchBreaks: [] as any[]
     },
     isInspectorHovered: false as boolean,
+    isInspectorFocused: false as boolean,
     isEditorSceneActive: false as boolean,
     isNodePickerActive: false as boolean,
     mcpStatus: { active: false, port: 4456, error: '', projectName: '', projectPath: '' } as { active: boolean, port: number, error: string, projectName: string, projectPath: string },
