@@ -443,6 +443,13 @@ export function useGameView(
                             if (nt) nt.selectedId = '';
                         }
                     } catch (err) { }
+                } else if (event.channel === 'clear-selection') {
+                    console.log('[IPC Received] <- clear-selection: clearing panel selection state');
+                    globalState.nodeDetail = null;
+                    const nt: any = nodeTreeRef.value;
+                    if (nt && typeof nt.selectedId !== 'undefined') {
+                        nt.selectedId = '';
+                    }
                 }
             });
 
