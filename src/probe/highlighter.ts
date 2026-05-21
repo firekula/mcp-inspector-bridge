@@ -20,8 +20,15 @@ export function startHighlighterHook() {
 
     if (window.cc && window.cc.director) {
         window.cc.director.on(window.cc.Director.EVENT_AFTER_SCENE_LAUNCH, () => {
-            Logger.log('[Highlighter] EVENT_AFTER_SCENE_LAUNCH 触发，再次调用 _initHighlightLayer');
+            Logger.log('[Highlighter] EVENT_AFTER_SCENE_LAUNCH 触发 — 清除旧场景选中状态');
+            // 清除旧场景的选中/悬停状态（节点已随旧场景销毁）
+            window.__mcpHighlightData.selectId = null;
+            window.__mcpHighlightData.hoverId = null;
             _initHighlightLayer();
+            // 通知面板同步清除树选中状态
+            if (window.__mcpInspector && window.__mcpInspector.sendClearSelection) {
+                window.__mcpInspector.sendClearSelection();
+            }
         });
 
         // 监听渲染帧重绘
@@ -37,6 +44,17 @@ export function startHighlighterHook() {
             const eng = window.cc;
             if (!data.hoverGraphics || !data.hoverNode || !data.hoverNode.isValid ||
                 !data.selectGraphics || !data.selectNode || !data.selectNode.isValid) {
+                // 兜底清除：节点已销毁则清空对应 ID
+                if (data.selectNode && !data.selectNode.isValid && data.selectId) {
+                    Logger.log('[Highlighter] 选中节点已销毁，清除 selectId');
+                    data.selectId = null;
+                    if (window.__mcpInspector && window.__mcpInspector.sendClearSelection) {
+                        window.__mcpInspector.sendClearSelection();
+                    }
+                }
+                if (data.hoverNode && !data.hoverNode.isValid && data.hoverId) {
+                    data.hoverId = null;
+                }
                 if (eng && eng.director && eng.director.getScene()) {
                     _initHighlightLayer();
                 }
