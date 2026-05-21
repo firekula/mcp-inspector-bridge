@@ -76,7 +76,7 @@ export function initPicker() {
                 if (e.type === 'mousedown') return;
 
                 const hitNode = self.hitTest(e.clientX, e.clientY); // 调试完毕，关闭 isDebug
-                let hitUuid = '';
+                let hitUuid: string | null = null;
                 if (hitNode) {
                     hitUuid = hitNode.uuid || hitNode.id;
                 }
@@ -85,7 +85,7 @@ export function initPicker() {
 
                 // 同步持久化高亮框焦点
                 if (window.__mcpCrawler && window.__mcpCrawler.setSelectionTarget) {
-                    window.__mcpCrawler.setSelectionTarget(hitUuid || '');
+                    window.__mcpCrawler.setSelectionTarget(hitUuid);
                 }
 
                 // 强制发送无差别 IPC 闭环，确保面板按钮能正确复位
