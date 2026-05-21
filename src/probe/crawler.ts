@@ -589,9 +589,11 @@ export function initCrawler() {
             if (!canvas) return { error: 'CANVAS_NOT_FOUND' };
             const rect = canvas.getBoundingClientRect();
             const frameSize = eng.view.getFrameSize();
+            const visibleOrigin = eng.view.getVisibleOrigin ? eng.view.getVisibleOrigin() : { x: 0, y: 0 };
+            const visibleSize = eng.view.getVisibleSize ? eng.view.getVisibleSize() : { width: frameSize.width, height: frameSize.height };
 
-            const clientX = rect.left + screenPt.x * (rect.width / frameSize.width);
-            const clientY = rect.bottom - screenPt.y * (rect.height / frameSize.height);
+            const clientX = rect.left + (screenPt.x - visibleOrigin.x) * (rect.width / visibleSize.width);
+            const clientY = rect.bottom - (screenPt.y - visibleOrigin.y) * (rect.height / visibleSize.height);
 
             function dispatchNativeEvent(type, cx, cy) {
                 let dispatched = false;

@@ -149,10 +149,12 @@ export function initPicker() {
             const rect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight, width: window.innerWidth, height: window.innerHeight };
 
             const frameSize = eng.view.getFrameSize();
-            
-            // 直接计算出 2D 逻辑屏幕坐标 (未扣除视口和缩放的纯 screenPt)
-            const x = (clientX - rect.left) * (frameSize.width / rect.width);
-            const y = (rect.bottom - clientY) * (frameSize.height / rect.height);
+            const visibleOrigin = eng.view.getVisibleOrigin ? eng.view.getVisibleOrigin() : { x: 0, y: 0 };
+            const visibleSize = eng.view.getVisibleSize ? eng.view.getVisibleSize() : { width: frameSize.width, height: frameSize.height };
+
+            // DOM 坐标换算到逻辑屏幕坐标，使用引擎标准 API 补偿 viewport 偏移
+            const x = visibleOrigin.x + (clientX - rect.left) * (visibleSize.width / rect.width);
+            const y = visibleOrigin.y + (rect.bottom - clientY) * (visibleSize.height / rect.height);
             const screenPt = eng.v2(x, y);
 
             let cameras = [];
