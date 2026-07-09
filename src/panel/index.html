@@ -616,6 +616,20 @@
                     <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.nodeCount.toLocaleString() }}</span>
                 </div>
             </div>
+
+            <!-- 截图按钮：浮于游戏画面右上角，半透明风格与 FPS 叠加框一致 -->
+            <div @click="takeScreenshot"
+                title="截取游戏画面（原始分辨率）"
+                style="position: absolute; top: 6px; right: 6px; z-index: 100;
+                       background: rgba(30, 30, 30, 0.8);
+                       border: 1px solid rgba(255,255,255,0.1);
+                       border-radius: 4px; width: 32px; height: 32px;
+                       display: flex; align-items: center; justify-content: center;
+                       cursor: pointer; user-select: none;
+                       font-size: 16px; line-height: 1;
+                       transition: background 0.15s;">
+                📷
+            </div>
         </div>
     </div>
 

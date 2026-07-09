@@ -2,6 +2,22 @@
 
 本项目记录 `mcp-inspector-bridge` 的重大里程碑、架构变更与缺陷修复记录。
 
+## [Unreleased] - 2026-07-09
+
+### ✨ 新特性
+
+- **游戏截图按钮 (Screenshot Button)**: 在游戏预览区右上角新增半透明截图按钮（📷），点击后并行执行剪贴板复制和文件保存。
+  - **截图机制**: 基于 Electron `webContents.capturePage()` 的 Chromium 合成器级截图，完全规避 WebGL `canvas.toDataURL()` 的 `preserveDrawingBuffer` 黑屏问题。
+  - **输出方式**: 自动复制到系统剪贴板 + 弹出保存对话框（PNG 格式，默认文件名 `screenshot-YYYYMMDD-HHmmss.png`），两个操作互不阻塞。
+  - **设计分辨率采集**: 运行时探针 `__mcpGetEnvInfo()` 新增 `designResolution` 字段，通过 `cc.view.getDesignResolutionSize()` 获取，为后续精确缩放预留接口。
+  - **按钮风格**: 半透明深色背景 + 📷 emoji，与 FPS 叠加框视觉一致；光标悬浮显示 "截取游戏画面（原始分辨率）" tooltip。
+  - **Vue Proxy 序列化修复**: IPC 传递 `designResolution` 时显式提取 `Number()` 原始值，解决 Vue `reactive` Proxy 对象无法通过 Electron 结构化克隆的问题。
+  - **涉及文件**: `src/probe/index.ts`, `src/panel/composables/useGameView.ts`, `src/panel/index.html`, `src/main.ts`
+
+### 🐛 缺陷修复
+
+- **修复截图按钮 IPC 序列化崩溃**: Vue `reactive()` 包裹的 `globalState.cocosInfo` 为 Proxy 对象，直接通过 `Editor.Ipc.sendToMain` 传递触发 `Error: An object could not be cloned.`。修复方式为显式构造普通 JS 对象 `{ width: Number(...), height: Number(...) }` 深拷贝传递。
+
 ---
 
 ## [0.1.6] - 2026-05-14

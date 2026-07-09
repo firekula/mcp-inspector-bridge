@@ -366,6 +366,70 @@ module.exports = {
                 }
             }
             handle();
+        },
+
+        // --- 截图功能 handlers ---
+        'screenshot-capture'(event: any, args: { designResolution: { width: number, height: number } }) {
+            try {
+                const { webContents, clipboard, nativeImage } = require('electron');
+                const { dialog } = require('electron');
+                const fs = require('fs');
+                const path = require('path');
+
+                const allWc = webContents.getAllWebContents();
+                const targetWc = allWc.find((wc: any) => {
+                    const url = wc.getURL();
+                    return url && url.includes('localhost:') && !url.includes('inspector');
+                });
+
+                if (!targetWc) {
+                    Editor.warn('[Screenshot] 未找到活跃的游戏预览 WebContents');
+                    if (event.reply) event.reply(null, { success: false, error: '未找到游戏预览画面' });
+                    return;
+                }
+
+                const handleImage = (img: any) => {
+                    if (!img || img.isEmpty()) {
+                        Editor.warn('[Screenshot] capturePage 返回空图像');
+                        return;
+                    }
+
+                    // 1. 写入剪贴板
+                    clipboard.writeImage(img);
+                    Editor.log('[Screenshot] 已复制到剪贴板');
+
+                    // 2. 弹出保存对话框
+                    const now = new Date();
+                    const pad = (n: number) => n.toString().padStart(2, '0');
+                    const ts = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+                    const defaultName = `screenshot-${ts}.png`;
+
+                    dialog.showSaveDialog({
+                        title: '保存游戏截图',
+                        defaultPath: defaultName,
+                        filters: [{ name: 'PNG 图片', extensions: ['png'] }],
+                    }).then((result: any) => {
+                        if (result.canceled || !result.filePath) return;
+                        const pngBuffer = img.toPNG();
+                        fs.writeFileSync(result.filePath, pngBuffer);
+                        Editor.log('[Screenshot] 已保存到:', result.filePath);
+                    }).catch((e: any) => {
+                        Editor.warn('[Screenshot] 保存对话框失败:', e.message);
+                    });
+                };
+
+                const result = targetWc.capturePage();
+                if (result && typeof result.then === 'function') {
+                    result.then(handleImage).catch((e: any) => {
+                        Editor.warn('[Screenshot] capturePage 失败:', e.message);
+                    });
+                } else if (result) {
+                    handleImage(result);
+                }
+            } catch (e: any) {
+                Editor.warn('[Screenshot] handler 异常:', e.message);
+                if (event.reply) event.reply(null, { success: false, error: e.message });
+            }
         }
     },
 };

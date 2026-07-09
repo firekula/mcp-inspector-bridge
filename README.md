@@ -121,6 +121,14 @@ npm run build
 - **FPS 叠加框开关** (替代引擎内置 FPS，控制插件叠加框显隐)
 - 全局静音
 
+### 📸 游戏截图
+
+在游戏预览区右上角提供半透明截图按钮（📷），与 FPS 叠加框风格一致，一键截取当前游戏画面。
+
+- **Chromium 合成器级截图**：基于 `webContents.capturePage()` 精确捕获游戏渲染输出，不受 WebGL `preserveDrawingBuffer` 限制，无黑屏问题。
+- **并行双通道输出**：点击即自动复制到系统剪贴板，同时弹出保存对话框（PNG 格式，默认时间戳文件名），互不阻塞。
+- **设计分辨率感知**：运行时探针自动采集 `cc.view.getDesignResolutionSize()`，预留精确缩放能力。
+
 ### 🔭 全景环境探针
 - **动态图集监测 (Dynamic Atlas)**：实时查阅框架层 Dynamic Atlas 的详细开关设置与贴图出血 (Bleeding) 策略。
 - **动态图集高性能查看器 (High Performance Atlas Viewer)**：突破闭包壁垒实现 WebGL 显存级纹理直出。内置受控二维抛拽视口结构 (2D Transform Viewport)，支持超大缓冲纹理 (如 2048x2048) 的平移、无极中心滚轮缩放与首屏自适应显示，根除浏览器的 `zoom` 滚动条塌缩崩溃。

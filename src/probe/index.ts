@@ -38,7 +38,14 @@ import { initPicker } from './picker';
                     isNative: cc.sys.isNative,
                     isMobile: cc.sys.isMobile,
                     language: cc.sys.language,
+                    designResolution: { width: 0, height: 0 },
                 };
+                try {
+                    if (cc.view && typeof cc.view.getDesignResolutionSize === 'function') {
+                        var dr = cc.view.getDesignResolutionSize();
+                        info.designResolution = { width: dr.width || 0, height: dr.height || 0 };
+                    }
+                } catch (e) {}
                 try {
                     if (cc.assetManager && cc.assetManager.downloader) {
                         info.downloader = { ...cc.assetManager.downloader };

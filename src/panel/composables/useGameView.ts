@@ -93,6 +93,20 @@ export function useGameView(
         executeMacro(isAudioMuted.value ? 'mute:true' : 'mute:false');
     };
 
+    const takeScreenshot = () => {
+        const wv: any = gameView.value;
+        if (!wv) {
+            console.warn('[Bridge] 找不到 game-view，截图失败');
+            return;
+        }
+        // 深拷贝：Vue reactive Proxy 对象无法通过 Electron IPC 结构化克隆传递
+        const rawDr = globalState.cocosInfo?.designResolution;
+        const dr = (rawDr && rawDr.width) ? { width: Number(rawDr.width), height: Number(rawDr.height) } : { width: 0, height: 0 };
+        if (typeof Editor !== 'undefined') {
+            Editor.Ipc.sendToMain('mcp-inspector-bridge:screenshot-capture', { designResolution: dr });
+        }
+    };
+
     watch(isShowFPS, (newVal: boolean) => {
         if (newVal) {
             onStartPolling?.();
@@ -548,6 +562,7 @@ export function useGameView(
         stepGame,
         toggleFPS,
         toggleMute,
+        takeScreenshot,
         setupGameViewListeners
     };
 }
