@@ -14,6 +14,14 @@
   - **Vue Proxy 序列化修复**: IPC 传递 `designResolution` 时显式提取 `Number()` 原始值，解决 Vue `reactive` Proxy 对象无法通过 Electron 结构化克隆的问题。
   - **涉及文件**: `src/probe/index.ts`, `src/panel/composables/useGameView.ts`, `src/panel/index.html`, `src/main.ts`
 
+- **自定义预览分辨率 (Custom Preview Resolutions)**: 在偏好设置面板（⚙️ 设置标签页）新增自定义分辨率管理功能，允许用户创建、编辑、删除全局预览分辨率预设。
+  - **管理界面**: 设置面板新增 `📐 自定义预览分辨率` 卡片区域，支持添加（名称选填 + 宽×高）、行内编辑、删除操作。
+  - **下拉菜单集成**: 分辨率 `<select>` 由静态 HTML 重构为基于 `resolutionOptions` computed 的动态渲染，内置 5 大分组常量化，自定义分辨率以独立「自定义」optgroup 附加在末尾。
+  - **显示规则**: 有名称时显示 `名称（W×H）`，无名称时显示 `自定义分辨率（W×H）`。
+  - **全局持久化**: 基于 `Editor.Profile` `profile://global/mcp-inspector-bridge.json` 全局存储，一次配置多项目共享。
+  - **安全回退**: 删除正在使用的自定义分辨率时，自动回退为「自动充满 (Fit Window)」。
+  - **涉及文件**: `src/main.ts`, `src/panel/composables/useLayout.ts`, `src/panel/index.html`
+
 ### 🐛 缺陷修复
 
 - **修复截图按钮 IPC 序列化崩溃**: Vue `reactive()` 包裹的 `globalState.cocosInfo` 为 Proxy 对象，直接通过 `Editor.Ipc.sendToMain` 传递触发 `Error: An object could not be cloned.`。修复方式为显式构造普通 JS 对象 `{ width: Number(...), height: Number(...) }` 深拷贝传递。
