@@ -1,9 +1,26 @@
 const { ref, computed, watch } = require('vue');
 declare const Editor: any;
 
+interface CustomResolution {
+    id: string;
+    name: string;
+    width: number;
+    height: number;
+}
+
 export function useLayout(globalState: any, wrapMount: any, wrapperSize: any) {
     const selectedResolution = ref('FIT');
     const isLandscape = ref(false);
+    
+    // --- 自定义分辨率 ---
+    const customResolutions: any = ref([]);
+    const editingResId: any = ref(null);
+    const newResName = ref('');
+    const newResWidth = ref('');
+    const newResHeight = ref('');
+    const editResName = ref('');
+    const editResWidth = ref('');
+    const editResHeight = ref('');
 
     let projectKey = 'default';
     try {
@@ -126,6 +143,89 @@ export function useLayout(globalState: any, wrapMount: any, wrapperSize: any) {
         document.addEventListener('mouseup', onMouseUp);
     };
 
+    // --- 内置分辨率选项定义 ---
+    const BUILTIN_RESOLUTION_GROUPS = [
+        {
+            label: null as string | null,
+            options: [
+                { value: 'FIT', text: '自动充满 (Fit Window)' }
+            ]
+        },
+        {
+            label: 'iOS/iPadOS 阵营',
+            options: [
+                { value: '1290x2796', text: 'iPhone 16 Pro Max/15 Pro Max (2796x1290)' },
+                { value: '1206x2622', text: 'iPhone 16 Pro (2622x1206)' },
+                { value: '1284x2778', text: 'iPhone 16 Plus/12 Pro Max (2778x1284)' },
+                { value: '1170x2532', text: 'iPhone 14/13 (2532x1170)' },
+                { value: '750x1334', text: 'iPhone 7/SE (1334x750)' },
+                { value: '2048x2732', text: 'iPad Pro 12.9" (2732x2048)' },
+                { value: '1488x2266', text: 'iPad mini 7 (2266x1488)' },
+            ]
+        },
+        {
+            label: '安卓直板手机',
+            options: [
+                { value: '1440x3176', text: '华为Mate 70 Pro+ (3176x1440)' },
+                { value: '1440x3088', text: '三星Galaxy S24 Ultra (3088x1440)' },
+                { value: '1440x3200', text: '主流2K旗舰标杆 (3200x1440)' },
+                { value: '1080x2340', text: '三星Galaxy S24/A55 (2340x1080)' },
+                { value: '1644x3840', text: '索尼Xperia 1 VI 全屏 (3840x1644)' },
+                { value: '1440x3120', text: '中兴Axon 60 Ultra/全面屏 (3120x1440)' },
+                { value: '1240x2772', text: '主流1.5K中端标杆 (2772x1240)' },
+                { value: '720x1600', text: '入门机基准下限测试 (1600x720)' },
+            ]
+        },
+        {
+            label: '折叠屏全形态',
+            options: [
+                { value: '1080x2440', text: '华为Mate X6 (外屏 2440x1080)' },
+                { value: '2230x2460', text: '华为Mate X6 (内屏 2460x2230)' },
+                { value: '904x2316', text: '三星Z Fold6 (外屏 2316x904)' },
+                { value: '2160x2592', text: '三星Z Fold6 (内屏 2592x2160)' },
+                { value: '2200x2480', text: '华为Mate Xs 2 (外折单屏 2480x2200)' },
+                { value: '1080x2640', text: '三星Z Flip6/竖折 (内屏 2640x1080)' },
+                { value: '2700x3120', text: '华为Mate XT (三折展开 3120x2700)' },
+            ]
+        },
+        {
+            label: '平板游戏横态',
+            options: [
+                { value: '1840x2880', text: '华为MatePad Pro 13.2" (2880x1840)' },
+                { value: '1848x3088', text: '三星Tab S10 Ultra (3088x1848)' },
+                { value: '1440x2560', text: '联想Y700 游戏专属平板 (2560x1440)' },
+                { value: '1200x2000', text: '联想小新Pad/主销级 (2000x1200)' },
+                { value: '1200x1920', text: '亚马逊Fire HD 10/出海基准 (1920x1200)' },
+            ]
+        },
+    ];
+
+    function getResolutionDisplayName(res: CustomResolution): string {
+        if (res.name && res.name.trim()) {
+            return `${res.name.trim()}（${res.width}×${res.height}）`;
+        }
+        return `自定义分辨率（${res.width}×${res.height}）`;
+    }
+
+    const resolutionOptions = computed(() => {
+        const groups = BUILTIN_RESOLUTION_GROUPS.map(g => ({
+            label: g.label,
+            options: [...g.options]
+        }));
+
+        if (customResolutions.value.length > 0) {
+            groups.push({
+                label: '自定义',
+                options: customResolutions.value.map((r: CustomResolution) => ({
+                    value: `${r.width}x${r.height}`,
+                    text: getResolutionDisplayName(r)
+                }))
+            });
+        }
+
+        return groups;
+    });
+
     const gameContainerStyle = computed(() => {
         if (selectedResolution.value === 'FIT' || wrapperSize.value.width === 0) {
             return { width: '100%', height: '100%', position: 'relative', overflow: 'hidden' };
@@ -209,6 +309,103 @@ export function useLayout(globalState: any, wrapMount: any, wrapperSize: any) {
         }
     };
 
+    function persistResolutions() {
+        if (typeof Editor !== 'undefined' && Editor.Ipc) {
+            Editor.Ipc.sendToMain('mcp-inspector-bridge:save-custom-resolutions',
+                JSON.parse(JSON.stringify(customResolutions.value)));
+        }
+    }
+
+    function loadCustomResolutions() {
+        if (typeof Editor !== 'undefined' && Editor.Ipc) {
+            Editor.Ipc.sendToMain('mcp-inspector-bridge:query-custom-resolutions', (err: any, res: CustomResolution[]) => {
+                if (!err && Array.isArray(res)) {
+                    customResolutions.value = res;
+                }
+            });
+        }
+    }
+
+    function addCustomResolution() {
+        const w = parseInt(newResWidth.value);
+        const h = parseInt(newResHeight.value);
+        if (isNaN(w) || isNaN(h) || w <= 0 || h <= 0) return;
+
+        customResolutions.value.push({
+            id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+            name: newResName.value.trim(),
+            width: w,
+            height: h
+        });
+
+        newResName.value = '';
+        newResWidth.value = '';
+        newResHeight.value = '';
+        persistResolutions();
+    }
+
+    function startEditResolution(res: CustomResolution) {
+        editingResId.value = res.id;
+        editResName.value = res.name;
+        editResWidth.value = res.width.toString();
+        editResHeight.value = res.height.toString();
+    }
+
+    function cancelEditResolution() {
+        editingResId.value = null;
+        editResName.value = '';
+        editResWidth.value = '';
+        editResHeight.value = '';
+    }
+
+    function saveEditResolution() {
+        const w = parseInt(editResWidth.value);
+        const h = parseInt(editResHeight.value);
+        if (isNaN(w) || isNaN(h) || w <= 0 || h <= 0) return;
+
+        const idx = customResolutions.value.findIndex((r: CustomResolution) => r.id === editingResId.value);
+        if (idx !== -1) {
+            customResolutions.value[idx].name = editResName.value.trim();
+            customResolutions.value[idx].width = w;
+            customResolutions.value[idx].height = h;
+        }
+
+        cancelEditResolution();
+        persistResolutions();
+    }
+
+    function deleteCustomResolution(id: string) {
+        const idx = customResolutions.value.findIndex((r: CustomResolution) => r.id === id);
+        if (idx === -1) return;
+
+        const deleted = customResolutions.value[idx];
+        customResolutions.value.splice(idx, 1);
+
+        // 如果当前选中的是被删除的自定义分辨率，回退到 FIT
+        const deletedValue = `${deleted.width}x${deleted.height}`;
+        if (selectedResolution.value === deletedValue) {
+            selectedResolution.value = 'FIT';
+        }
+
+        persistResolutions();
+    }
+
+    // 初始化加载
+    loadCustomResolutions();
+
+    // 监听：如果选中的自定义分辨率已不在列表中，回退到 FIT
+    watch([customResolutions, selectedResolution], () => {
+        if (selectedResolution.value === 'FIT') return;
+        // 检查是否匹配内置分辨率
+        for (const group of BUILTIN_RESOLUTION_GROUPS) {
+            if (group.options.some(o => o.value === selectedResolution.value)) return;
+        }
+        // 检查是否匹配自定义分辨率
+        if (customResolutions.value.some((r: CustomResolution) => `${r.width}x${r.height}` === selectedResolution.value)) return;
+        // 不匹配任何已知分辨率，且不是 FIT，回退
+        selectedResolution.value = 'FIT';
+    });
+
     watch(selectedResolution, (newVal: string) => {
         try {
             if (typeof Editor !== 'undefined' && Editor.Ipc) {
@@ -220,6 +417,7 @@ export function useLayout(globalState: any, wrapMount: any, wrapperSize: any) {
     return {
         selectedResolution,
         isLandscape,
+        resolutionOptions,
         rightPanelWidth,
         isDragging,
         startDrag,
@@ -229,6 +427,22 @@ export function useLayout(globalState: any, wrapMount: any, wrapperSize: any) {
         startNodeTreeDrag,
         gameContainerStyle,
         rotateScreen,
-        setupResizeObserver
+        setupResizeObserver,
+        // 自定义分辨率
+        customResolutions,
+        editingResId,
+        newResName,
+        newResWidth,
+        newResHeight,
+        editResName,
+        editResWidth,
+        editResHeight,
+        addCustomResolution,
+        startEditResolution,
+        cancelEditResolution,
+        saveEditResolution,
+        deleteCustomResolution,
+        getResolutionDisplayName,
+        loadCustomResolutions,
     };
 }

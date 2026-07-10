@@ -506,42 +506,14 @@
             <div style="display: flex; gap: 5px; flex: 1; min-width: 200px;">
                 <select v-model="selectedResolution" class="truncate-text"
                     style="background:#555; color:#fff; border:1px solid #777; padding:3px; outline:none; border-radius:3px; flex: 1;">
-                    <option value="FIT">自动充满 (Fit Window)</option>
-                    <optgroup label="iOS/iPadOS 阵营">
-                        <option value="1290x2796">iPhone 16 Pro Max/15 Pro Max (2796x1290)</option>
-                        <option value="1206x2622">iPhone 16 Pro (2622x1206)</option>
-                        <option value="1284x2778">iPhone 16 Plus/12 Pro Max (2778x1284)</option>
-                        <option value="1170x2532">iPhone 14/13 (2532x1170)</option>
-                        <option value="750x1334">iPhone 7/SE (1334x750)</option>
-                        <option value="2048x2732">iPad Pro 12.9" (2732x2048)</option>
-                        <option value="1488x2266">iPad mini 7 (2266x1488)</option>
-                    </optgroup>
-                    <optgroup label="安卓直板手机">
-                        <option value="1440x3176">华为Mate 70 Pro+ (3176x1440)</option>
-                        <option value="1440x3088">三星Galaxy S24 Ultra (3088x1440)</option>
-                        <option value="1440x3200">主流2K旗舰标杆 (3200x1440)</option>
-                        <option value="1080x2340">三星Galaxy S24/A55 (2340x1080)</option>
-                        <option value="1644x3840">索尼Xperia 1 VI 全屏 (3840x1644)</option>
-                        <option value="1440x3120">中兴Axon 60 Ultra/全面屏 (3120x1440)</option>
-                        <option value="1240x2772">主流1.5K中端标杆 (2772x1240)</option>
-                        <option value="720x1600">入门机基准下限测试 (1600x720)</option>
-                    </optgroup>
-                    <optgroup label="折叠屏全形态">
-                        <option value="1080x2440">华为Mate X6 (外屏 2440x1080)</option>
-                        <option value="2230x2460">华为Mate X6 (内屏 2460x2230)</option>
-                        <option value="904x2316">三星Z Fold6 (外屏 2316x904)</option>
-                        <option value="2160x2592">三星Z Fold6 (内屏 2592x2160)</option>
-                        <option value="2200x2480">华为Mate Xs 2 (外折单屏 2480x2200)</option>
-                        <option value="1080x2640">三星Z Flip6/竖折 (内屏 2640x1080)</option>
-                        <option value="2700x3120">华为Mate XT (三折展开 3120x2700)</option>
-                    </optgroup>
-                    <optgroup label="平板游戏横态">
-                        <option value="1840x2880">华为MatePad Pro 13.2" (2880x1840)</option>
-                        <option value="1848x3088">三星Tab S10 Ultra (3088x1848)</option>
-                        <option value="1440x2560">联想Y700 游戏专属平板 (2560x1440)</option>
-                        <option value="1200x2000">联想小新Pad/主销级 (2000x1200)</option>
-                        <option value="1200x1920">亚马逊Fire HD 10/出海基准 (1920x1200)</option>
-                    </optgroup>
+                    <template v-for="group in resolutionOptions" :key="group.label || '__root'">
+                        <optgroup v-if="group.label" :label="group.label">
+                            <option v-for="opt in group.options" :key="opt.value" :value="opt.value">{{ opt.text }}</option>
+                        </optgroup>
+                        <template v-else>
+                            <option v-for="opt in group.options" :key="opt.value" :value="opt.value">{{ opt.text }}</option>
+                        </template>
+                    </template>
                 </select>
                 <button class="icon-btn" title="横竖屏切换" @click="rotateScreen">🔄</button>
             </div>
@@ -1273,6 +1245,63 @@
                         <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;">
                             <input type="radio" v-model="globalState.inspectorLayout" value="vertical"> 纵向并排 (上下)
                         </label>
+                    </div>
+                </div>
+
+                <div
+                    style="margin-bottom: 20px; background: #252525; padding: 12px; border-radius: 4px; border: 1px solid #333;">
+                    <div style="font-size: var(--base-font-size, 13px); font-weight: bold; margin-bottom: 10px;">📐 自定义预览分辨率</div>
+                    <div style="font-size: calc(var(--base-font-size, 13px) - 1px); color: #aaa; margin-bottom: 12px;">
+                        添加自定义分辨率，将出现在预览窗口的分辨率下拉菜单中（全局生效，跨项目共享）。</div>
+
+                    <!-- 添加表单 -->
+                    <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 12px;">
+                        <input v-model="newResName" placeholder="名称（选填）"
+                            style="background:#111; color:#fff; padding:4px 8px; border-radius:3px; border:1px solid #555; width:130px; font-size: calc(var(--base-font-size, 13px) - 1px);">
+                        <input v-model="newResWidth" placeholder="宽" type="number" min="1"
+                            style="background:#111; color:#fff; padding:4px 8px; border-radius:3px; border:1px solid #555; width:70px; font-size: calc(var(--base-font-size, 13px) - 1px);">
+                        <span style="color:#888;">×</span>
+                        <input v-model="newResHeight" placeholder="高" type="number" min="1"
+                            style="background:#111; color:#fff; padding:4px 8px; border-radius:3px; border:1px solid #555; width:70px; font-size: calc(var(--base-font-size, 13px) - 1px);">
+                        <button class="icon-btn" style="padding: 4px 12px; width: auto; font-size: calc(var(--base-font-size, 13px) - 1px);"
+                            @click="addCustomResolution">添加</button>
+                    </div>
+
+                    <!-- 已有列表 -->
+                    <div v-if="customResolutions.length > 0"
+                        style="display: flex; flex-direction: column; gap: 6px;">
+                        <div v-for="res in customResolutions" :key="res.id"
+                            style="display: flex; align-items: center; gap: 8px; background: #1a1a1a; padding: 6px 10px; border-radius: 3px; border: 1px solid #333;">
+
+                            <!-- 正常显示模式 -->
+                            <template v-if="editingResId !== res.id">
+                                <span style="flex: 1; color: #ddd; font-size: calc(var(--base-font-size, 13px) - 1px);">
+                                    🏷️ {{ getResolutionDisplayName(res) }}
+                                </span>
+                                <button class="icon-btn" style="padding: 2px 8px; width: auto; font-size: calc(var(--base-font-size, 13px) - 2px);"
+                                    @click="startEditResolution(res)" title="编辑">✏️</button>
+                                <button class="icon-btn" style="padding: 2px 8px; width: auto; font-size: calc(var(--base-font-size, 13px) - 2px);"
+                                    @click="deleteCustomResolution(res.id)" title="删除">🗑️</button>
+                            </template>
+
+                            <!-- 编辑模式 -->
+                            <template v-else>
+                                <input v-model="editResName" placeholder="名称（选填）"
+                                    style="background:#111; color:#fff; padding:3px 6px; border-radius:3px; border:1px solid #555; width:120px; font-size: calc(var(--base-font-size, 13px) - 1px);">
+                                <input v-model="editResWidth" type="number" min="1"
+                                    style="background:#111; color:#fff; padding:3px 6px; border-radius:3px; border:1px solid #555; width:60px; font-size: calc(var(--base-font-size, 13px) - 1px);">
+                                <span style="color:#888;">×</span>
+                                <input v-model="editResHeight" type="number" min="1"
+                                    style="background:#111; color:#fff; padding:3px 6px; border-radius:3px; border:1px solid #555; width:60px; font-size: calc(var(--base-font-size, 13px) - 1px);">
+                                <button class="icon-btn" style="padding: 3px 10px; width: auto; font-size: calc(var(--base-font-size, 13px) - 2px); background: #4caf50; border-color: #4caf50;"
+                                    @click="saveEditResolution">保存</button>
+                                <button class="icon-btn" style="padding: 3px 10px; width: auto; font-size: calc(var(--base-font-size, 13px) - 2px);"
+                                    @click="cancelEditResolution">取消</button>
+                            </template>
+                        </div>
+                    </div>
+                    <div v-else style="color: #666; font-size: calc(var(--base-font-size, 13px) - 2px); margin-top: 8px;">
+                        暂无自定义分辨率，在上方添加。
                     </div>
                 </div>
             </div>

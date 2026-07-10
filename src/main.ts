@@ -158,9 +158,21 @@ module.exports = {
             profile.set('panel-width', value);
             profile.save();
         },
+        'query-custom-resolutions'(event: any) {
+            const profile = Editor.Profile.load('profile://global/mcp-inspector-bridge.json', 'mcp-inspector-bridge');
+            const res = profile.get('custom-resolutions') || [];
+            if (event.reply) {
+                event.reply(null, res);
+            }
+        },
+        'save-custom-resolutions'(event: any, value: any[]) {
+            const profile = Editor.Profile.load('profile://global/mcp-inspector-bridge.json', 'mcp-inspector-bridge');
+            profile.set('custom-resolutions', value);
+            profile.save();
+        },
         'query-preview-port'(event: any) {
             let port = 7456;
-            
+
             try {
                 if (typeof Editor !== 'undefined' && Editor.PreviewServer) {
                     if ((Editor.PreviewServer as any)._previewPort) {
