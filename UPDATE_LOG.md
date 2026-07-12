@@ -6,6 +6,9 @@
 
 ### ✨ 新特性
 
+- **组件属性完整提取与打印安全增强 (Complete Component Properties & Serialization Security)**
+  - 修复组件类名提取方法以拉取 `@property` 的 `__attrs__` 注册表，恢复 `sp.Skeleton` 与 `dragonBones.ArmatureDisplay` 组件的骨骼资源及其动画、皮肤、骨架的下拉选择功能。
+  - 过滤隐藏 `AnimList` 等非标准的冗余属性；并在组件打印序列化中安全拦截 `cc.Component` 引用类型、DOM 元素及全局对象，用 try-catch 防御。
 - **游戏截图按钮 (Screenshot Button)**: 在游戏预览区右上角新增半透明截图按钮（📷），点击后并行执行剪贴板复制和文件保存。
   - **截图机制**: 基于 Electron `webContents.capturePage()` 的 Chromium 合成器级截图，完全规避 WebGL `canvas.toDataURL()` 的 `preserveDrawingBuffer` 黑屏问题。
   - **输出方式**: 自动复制到系统剪贴板 + 弹出保存对话框（PNG 格式，默认文件名 `screenshot-YYYYMMDD-HHmmss.png`），两个操作互不阻塞。

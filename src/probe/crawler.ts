@@ -54,6 +54,19 @@ function initVisualFeedbackStyle() {
     }
 }
 
+function getComponentClassName(comp) {
+    if (!comp) return "UnknownComponent";
+    let cname = "UnknownComponent";
+    if (window.cc && window.cc.js && typeof window.cc.js.getClassName === 'function') {
+        cname = window.cc.js.getClassName(comp);
+    }
+    if (!cname) {
+        cname = comp.name || (comp.constructor ? comp.constructor.name : "UnknownComponent");
+    }
+    const match = cname.match(/<([^>]+)>/);
+    return match ? match[1] : cname;
+}
+
 export function initCrawler() {
     window.__mcpCrawler = {
         findNodeByUuid: function (uuid, root) {
@@ -149,19 +162,32 @@ export function initCrawler() {
             if (node._components) {
                 for (let i = 0; i < node._components.length; i++) {
                     const comp = node._components[i];
-                    let cname = comp.name || comp.__classname__ || "UnknownComponent";
-                    const match = cname.match(/<([^>]+)>/);
-                    if (match) cname = match[1];
+                      const cname = getComponentClassName(comp);
                     const props = [];
 
                     let propKeys = [];
-                    if (comp.constructor && Array.isArray(comp.constructor.__props__)) {
-                        propKeys = comp.constructor.__props__;
+                    const registeredProps = new Set();
+                    if (comp.constructor) {
+                        if (Array.isArray(comp.constructor.__props__)) {
+                            comp.constructor.__props__.forEach(p => registeredProps.add(p));
+                        }
+                        if (comp.constructor.__attrs__) {
+                            Object.keys(comp.constructor.__attrs__).forEach(attrKey => {
+                                const idx = attrKey.indexOf('|');
+                                if (idx > 0) {
+                                    registeredProps.add(attrKey.substring(0, idx));
+                                }
+                            });
+                        }
+                    }
+                    
+                    if (registeredProps.size > 0) {
+                        propKeys = Array.from(registeredProps);
                     } else {
                         propKeys = Object.keys(comp);
                     }
 
-                    const hiddenBuiltins = ["name", "uuid", "node", "enabled", "enabledInHierarchy", "_scriptAsset", "__scriptAsset", "_isOnLoadCalled", "_objFlags"];
+                    const hiddenBuiltins = ["name", "uuid", "node", "enabled", "enabledInHierarchy", "_scriptAsset", "__scriptAsset", "_isOnLoadCalled", "_objFlags", "AnimList"];
 
                     for (let j = 0; j < propKeys.length; j++) {
                         const key = propKeys[j];
@@ -300,6 +326,20 @@ export function initCrawler() {
                                             if (rd && rd.skins) enumList = rd.skins.map((s) => s.name);
                                         } catch (e) { }
                                     }
+                                } else if (cname === "dragonBones.ArmatureDisplay" || cname === "ArmatureDisplay") {
+                                    if (key === "armatureName") {
+                                        try {
+                                            if (typeof comp.getArmatureNames === 'function') {
+                                                enumList = ["<None>"].concat(comp.getArmatureNames() || []);
+                                            }
+                                        } catch (e) { }
+                                    } else if (key === "animationName") {
+                                        try {
+                                            if (typeof comp.getAnimationNames === 'function') {
+                                                enumList = ["<None>"].concat(comp.getAnimationNames(comp.armatureName) || []);
+                                            }
+                                        } catch (e) { }
+                                    }
                                 }
                                 const propData = { key, value: exportValue, type };
                                 if (enumList) propData.enumList = enumList;
@@ -372,9 +412,7 @@ export function initCrawler() {
                         } else {
                             for (let i = 0; i < node._components.length; i++) {
                                 const comp = node._components[i];
-                                let cname = comp.name || comp.__classname__ || "Unknown";
-                                const match = cname.match(/<([^>]+)>/);
-                                if (match) cname = match[1];
+                                  const cname = getComponentClassName(comp);
 
                                 if (cname === compName) {
                                     targetComp = comp;
@@ -426,50 +464,69 @@ export function initCrawler() {
             const eng = window.cc || {};
 
             function getNodePath(n) {
-                if (!n) return '';
-                let isValidStr = (n.isValid === false) ? ' (Destroyed)' : '';
-                let path = n.name + isValidStr;
-                let current = n.parent;
-                while (current) {
-                    let curValidStr = (current.isValid === false) ? ' (Destroyed)' : '';
-                    path = current.name + curValidStr + '/' + path;
-                    current = current.parent;
+                try {
+                    if (!n) return '';
+                    let isValidStr = (n.isValid === false) ? ' (Destroyed)' : '';
+                    let path = (n.name || 'Unnamed') + isValidStr;
+                    let current = n.parent;
+                    while (current) {
+                        let curValidStr = (current.isValid === false) ? ' (Destroyed)' : '';
+                        path = (current.name || 'Unnamed') + curValidStr + '/' + path;
+                        current = current.parent;
+                    }
+                    return path;
+                } catch (e) {
+                    return '[Unknown Node Path]';
                 }
-                return path;
             }
 
             const seen = new WeakSet();
             const replacer = function (key, value) {
-                if (value === null || value === undefined) return value;
+                try {
+                    if (value === null || value === undefined) return value;
 
-                // 处理 cc.Node
-                if (eng.Node && value instanceof eng.Node) {
-                    return `[ cc.Node: ${getNodePath(value)} ]`;
-                }
-
-                // 处理 cc.Asset
-                if (eng.Asset && value instanceof eng.Asset) {
-                    let clsName = "cc.Asset";
-                    if (value.__classname__) clsName = value.__classname__;
-                    else if (value.constructor && value.constructor.name) clsName = value.constructor.name;
-                    return `[ ${clsName}: ${value.name || value._name || 'Unnamed'} ]`;
-                }
-
-                if (typeof value === 'object') {
-                    if (seen.has(value)) {
-                        return "[Circular]";
+                    // 避免序列化 DOM 元素或 window/document 等全局对象
+                    if (value === window || value === document || (typeof value === 'object' && value.nodeType !== undefined)) {
+                        return "[DOM Element]";
                     }
-                    seen.add(value);
-                }
 
-                return value;
+                    // 处理 cc.Node
+                    if (eng.Node && (value instanceof eng.Node || (value.constructor && value.constructor.name === 'Node'))) {
+                        return `[ cc.Node: ${getNodePath(value)} ]`;
+                    }
+
+                    // 处理 cc.Component
+                    if (eng.Component && (value instanceof eng.Component || (value.constructor && value.constructor.prototype instanceof eng.Component))) {
+                        let compName = value.name || value.__classname__ || (value.constructor ? value.constructor.name : "Component");
+                        const match = compName.match(/<([^>]+)>/);
+                        if (match) compName = match[1];
+                        return `[ Component: ${compName} on Node: ${getNodePath(value.node)} ]`;
+                    }
+
+                    // 处理 cc.Asset
+                    if (eng.Asset && (value instanceof eng.Asset || (value.constructor && value.constructor.prototype instanceof eng.Asset))) {
+                        let clsName = "cc.Asset";
+                        if (value.__classname__) clsName = value.__classname__;
+                        else if (value.constructor && value.constructor.name) clsName = value.constructor.name;
+                        return `[ ${clsName}: ${value.name || value._name || 'Unnamed'} ]`;
+                    }
+
+                    if (typeof value === 'object') {
+                        if (seen.has(value)) {
+                            return "[Circular]";
+                        }
+                        seen.add(value);
+                    }
+
+                    return value;
+                } catch (e) {
+                    return "[Error Serializing Property]";
+                }
             };
 
             try {
                 const jsonStr = JSON.stringify(comp, replacer, 4);
-                let compName = comp.name || comp.__classname__ || "Unknown";
-                const match = compName.match(/<([^>]+)>/);
-                if (match) compName = match[1];
+                const compName = getComponentClassName(comp);
 
                 console.log(`%c[MCP] 组件 (${compName}) 数据导出成功 👇`, 'color: #00ff00; font-weight: bold;');
                 console.log(jsonStr);
