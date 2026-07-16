@@ -442,6 +442,30 @@ module.exports = {
                 Editor.warn('[Screenshot] handler 异常:', e.message);
                 if (event.reply) event.reply(null, { success: false, error: e.message });
             }
+        },
+        'show-save-video-dialog'(event: any, args: any) {
+            try {
+                const { dialog } = require('electron');
+                const now = new Date();
+                const pad = (n: number) => n.toString().padStart(2, '0');
+                const ts = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+                
+                const ext = (args && typeof args.ext === 'string') ? args.ext : 'webm';
+                const defaultName = `video-${ts}.${ext}`;
+                const filterName = ext === 'mp4' ? 'MP4 视频' : 'WebM 视频';
+
+                dialog.showSaveDialog({
+                    title: '保存游戏录屏',
+                    defaultPath: defaultName,
+                    filters: [{ name: filterName, extensions: [ext] }],
+                }).then((result: any) => {
+                    if (event.reply) event.reply(null, result);
+                }).catch((e: any) => {
+                    if (event.reply) event.reply(e);
+                });
+            } catch (e: any) {
+                if (event.reply) event.reply(e);
+            }
         }
     },
 };

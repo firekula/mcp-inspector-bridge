@@ -1,12 +1,35 @@
 const { ipcRenderer } = require('electron');
 
+// ===== 全局拦截 Web Audio 节点，以旁路捕获游戏所有的声音轨道 =====
+let globalAudioDestination: any = null;
+if (typeof AudioNode !== 'undefined' && AudioNode.prototype) {
+    const originalConnect = AudioNode.prototype.connect;
+    (AudioNode.prototype as any).connect = function(destination: any, output?: number, input?: number) {
+        // 执行原始连接以防破坏物理输出
+        const result = originalConnect.apply(this, arguments as any);
+        
+        // 当节点连接到扬声器 (context.destination) 时，双路连接至我们的录音节点
+        if (destination && this.context && destination === this.context.destination) {
+            try {
+                if (!globalAudioDestination) {
+                    globalAudioDestination = (this.context as any).createMediaStreamDestination();
+                }
+                originalConnect.call(this, globalAudioDestination);
+            } catch (e) {
+                // 忽略异常，防重复连接等问题
+            }
+        }
+        return result;
+    };
+}
+
 /**
  * 注入到 Webview 的预加载脚本 (Preload.js)
  * 在沙盒环境与主/面板进程间充当网桥
  *
  * 【Phase 4 重构】移除了错误的 isTopFrame 分流逻辑。
  * Cocos Creator 2.4.x 的预览页面没有子 iframe，cc 引擎直接运行在顶层 window 中。
- * 因此 preload 必须在顶层直接挂载通信桥 + 注入探针。
+ * Therefore preload 必须在顶层直接挂载通信桥 + 注入探针。
  */
 window.addEventListener('DOMContentLoaded', () => {
     // ===== 1. 隐藏 Cocos 预览页多余的工具栏 =====
@@ -155,4 +178,127 @@ window.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
         }
     }, 1000); // 延迟 1 秒等待子 iframe 加载
+
+    // ===== 9. 录屏功能底层捕获与生命周期调度 =====
+    let mediaRecorder: any = null;
+    let recordedChunks: any[] = [];
+    let recordAnimFrameId: number | null = null;
+
+    function startRecording(fps: number, scale: number) {
+        const MAX_SIZE = 4096; // 4096px 物理边界截断保护
+        const canvas = document.getElementById('GameCanvas') as HTMLCanvasElement;
+        if (!canvas) {
+            ipcRenderer.sendToHost('record-error', '未找到游戏画板 GameCanvas');
+            return;
+        }
+
+        let recordStream;
+        let isDrawing = true;
+
+        if (scale !== 1.0) {
+            const offscreen = document.createElement('canvas');
+            let w = canvas.width * scale;
+            let h = canvas.height * scale;
+            if (w > MAX_SIZE || h > MAX_SIZE) {
+                const minRatio = Math.min(MAX_SIZE / w, MAX_SIZE / h);
+                w = Math.round(w * minRatio);
+                h = Math.round(h * minRatio);
+                console.warn(`[Record] 录制缩放超限，已限缩至最高分辨率边界: ${w}x${h}`);
+            }
+            offscreen.width = w;
+            offscreen.height = h;
+            const ctx = offscreen.getContext('2d');
+            
+            const drawFrame = () => {
+                if (!isDrawing) return;
+                if (ctx) {
+                    ctx.drawImage(canvas, 0, 0, offscreen.width, offscreen.height);
+                }
+                recordAnimFrameId = requestAnimationFrame(drawFrame);
+            };
+            drawFrame();
+
+            try {
+                recordStream = (offscreen as any).captureStream(fps);
+            } catch (e) {
+                recordStream = (offscreen as any).captureStream();
+            }
+        } else {
+            try {
+                recordStream = (canvas as any).captureStream(fps);
+            } catch (e) {
+                recordStream = (canvas as any).captureStream();
+            }
+        }
+
+        // 尝试混入游戏声音轨道
+        if (globalAudioDestination && globalAudioDestination.stream) {
+            const audioTracks = globalAudioDestination.stream.getAudioTracks();
+            if (audioTracks.length > 0) {
+                try {
+                    const combinedStream = new MediaStream();
+                    const videoTracks = recordStream.getVideoTracks();
+                    if (videoTracks.length > 0) {
+                        combinedStream.addTrack(videoTracks[0]);
+                    }
+                    combinedStream.addTrack(audioTracks[0]);
+                    recordStream = combinedStream;
+                } catch (mixErr) {
+                    // 默默忽略，不干扰控制台
+                }
+            }
+        }
+
+        recordedChunks = [];
+        let options = { mimeType: 'video/webm;codecs=vp9' };
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options = { mimeType: 'video/webm;codecs=vp8' };
+        }
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options = { mimeType: 'video/webm' };
+        }
+
+        try {
+            mediaRecorder = new MediaRecorder(recordStream, options);
+            mediaRecorder.ondataavailable = (event: any) => {
+                if (event.data && event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+            mediaRecorder.onstop = () => {
+                isDrawing = false;
+                if (recordAnimFrameId) {
+                    cancelAnimationFrame(recordAnimFrameId);
+                    recordAnimFrameId = null;
+                }
+                const blob = new Blob(recordedChunks, { type: options.mimeType });
+                const reader = new FileReader();
+                reader.onload = () => {
+                    ipcRenderer.sendToHost('record-complete', reader.result);
+                };
+                reader.readAsArrayBuffer(blob);
+            };
+            mediaRecorder.start(1000);
+            ipcRenderer.sendToHost('record-status-changed', { recording: true });
+        } catch (e: any) {
+            isDrawing = false;
+            if (recordAnimFrameId) cancelAnimationFrame(recordAnimFrameId);
+            ipcRenderer.sendToHost('record-error', '录制初始化失败: ' + e.message);
+        }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+    }
+
+    ipcRenderer.on('record-command', (_event: any, args: any) => {
+        const data = typeof args === 'string' ? { action: args } : args;
+        if (data.action === 'start') {
+            startRecording(data.fps || 30, data.scale || 1.0);
+        } else if (data.action === 'stop') {
+            stopRecording();
+        }
+    });
 });

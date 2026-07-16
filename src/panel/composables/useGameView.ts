@@ -107,6 +107,229 @@ export function useGameView(
         }
     };
 
+    const isRecording = ref(false);
+    let recordStartTime = 0;
+
+    const fixWebmDuration = (blob: Blob, durationMs: number): Promise<Blob> => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const buffer = reader.result as ArrayBuffer;
+                const view = new DataView(buffer);
+                
+                let infoPos = -1;
+                const len = buffer.byteLength;
+                for (let i = 0; i < len - 4; i++) {
+                    if (view.getUint8(i) === 0x15 && 
+                        view.getUint8(i+1) === 0x49 && 
+                        view.getUint8(i+2) === 0xA9 && 
+                        view.getUint8(i+3) === 0x66) {
+                        infoPos = i;
+                        break;
+                    }
+                }
+                
+                if (infoPos === -1) {
+                    resolve(blob);
+                    return;
+                }
+                
+                let durationPos = -1;
+                const searchLimit = Math.min(infoPos + 150, len - 4);
+                for (let i = infoPos; i < searchLimit; i++) {
+                    if (view.getUint8(i) === 0x44 && view.getUint8(i+1) === 0x89) {
+                        durationPos = i;
+                        break;
+                    }
+                }
+                
+                if (durationPos === -1) {
+                    resolve(blob);
+                    return;
+                }
+                
+                const lenByte = view.getUint8(durationPos + 2);
+                let dataLen = 0;
+                let valPos = 0;
+                
+                if ((lenByte & 0x80) === 0x80) {
+                    dataLen = lenByte & 0x7F;
+                    valPos = durationPos + 3;
+                } else if ((lenByte & 0x40) === 0x40) {
+                    dataLen = ((lenByte & 0x3F) << 8) | view.getUint8(durationPos + 3);
+                    valPos = durationPos + 4;
+                }
+                
+                if (dataLen === 4 && valPos + 4 <= len) {
+                    view.setFloat32(valPos, durationMs, false);
+                } else if (dataLen === 8 && valPos + 8 <= len) {
+                    view.setFloat64(valPos, durationMs, false);
+                }
+                
+                resolve(new Blob([buffer], { type: blob.type }));
+            };
+            reader.readAsArrayBuffer(blob);
+        });
+    };
+
+    const startRecord = () => {
+        const wv: any = gameView.value;
+        if (!wv) {
+            console.warn('[Bridge] 找不到 game-view，录屏失败');
+            return;
+        }
+        recordStartTime = Date.now();
+        wv.send('record-command', {
+            action: 'start',
+            fps: globalState.recordFps || 30,
+            scale: globalState.recordScale || 1.0
+        });
+    };
+
+    const stopRecord = () => {
+        const wv: any = gameView.value;
+        if (!wv) return;
+        wv.send('record-command', { action: 'stop' });
+    };
+
+    const getFfmpegPath = (): string => {
+        const path = require('path');
+        const fs = require('fs');
+        
+        let rootPath = '';
+        if (typeof Editor !== 'undefined' && typeof Editor.url === 'function') {
+            try {
+                rootPath = Editor.url('packages://mcp-inspector-bridge');
+            } catch (e) {}
+        }
+        
+        if (!rootPath) {
+            try {
+                rootPath = path.join(__dirname, '..', '..');
+            } catch (e) {}
+        }
+
+        const isWin = process.platform === 'win32';
+        const pathsToTry = isWin ? [
+            path.join(rootPath, 'bin', 'win32', 'ffmpeg.exe'),
+            path.join(rootPath, 'bin', 'ffmpeg.exe'),
+            path.join(rootPath, 'ffmpeg.exe')
+        ] : [
+            path.join(rootPath, 'bin', 'darwin', 'ffmpeg'),
+            path.join(rootPath, 'bin', 'ffmpeg'),
+            path.join(rootPath, 'ffmpeg')
+        ];
+
+        for (const p of pathsToTry) {
+            if (p && fs.existsSync(p)) {
+                return p;
+            }
+        }
+        
+        return 'ffmpeg';
+    };
+
+    const handleSaveVideo = (arrayBuffer: ArrayBuffer) => {
+        if (typeof Editor === 'undefined') return;
+        
+        const duration = Date.now() - recordStartTime;
+        const blob = new Blob([arrayBuffer], { type: 'video/webm' });
+        
+        fixWebmDuration(blob, duration).then((fixedBlob) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const fixedBuffer = reader.result as ArrayBuffer;
+                const targetFormat = globalState.recordFormat || 'webm';
+                
+                if (targetFormat === 'mp4') {
+                    Editor.Ipc.sendToMain('mcp-inspector-bridge:show-save-video-dialog', { ext: 'mp4' }, (err: any, result: any) => {
+                        if (err) {
+                            Editor.warn('[Record] 弹出保存框失败:', err.message || err);
+                            return;
+                        }
+                        if (result && !result.canceled && result.filePath) {
+                            const ffmpegPath = getFfmpegPath();
+                            const { exec } = require('child_process');
+                            
+                            const checkCmd = ffmpegPath === 'ffmpeg' ? 'ffmpeg -version' : `"${ffmpegPath}" -version`;
+                            exec(checkCmd, (ffmpegErr: any) => {
+                                if (ffmpegErr) {
+                                    const webmPath = result.filePath.replace(/\.mp4$/i, '.webm');
+                                    try {
+                                        const fs = require('fs');
+                                        fs.writeFileSync(webmPath, Buffer.from(fixedBuffer));
+                                        Editor.warn('[Record] 未检测到本地或系统安装的 FFmpeg 命令行工具（在插件根目录 bin/win32/ffmpeg.exe 亦未找到），无法自动转为 MP4。已将录像保存为进度条和寻道完美修复的 WebM 视频：', webmPath);
+                                    } catch (e: any) {
+                                        Editor.warn('[Record] 写入本地视频失败:', e.message);
+                                    }
+                                } else {
+                                    const fs = require('fs');
+                                    const path = require('path');
+                                    const tempWebmPath = path.join(require('os').tmpdir(), `temp-record-${Date.now()}.webm`);
+                                    try {
+                                        fs.writeFileSync(tempWebmPath, Buffer.from(fixedBuffer));
+                                        
+                                        const ffmpegCmd = (c: string) => ffmpegPath === 'ffmpeg' 
+                                            ? `ffmpeg -y -i "${tempWebmPath}" ${c} "${result.filePath}"`
+                                            : `"${ffmpegPath}" -y -i "${tempWebmPath}" ${c} "${result.filePath}"`;
+                                            
+                                        const fps = globalState.recordFps || 30;
+                                        
+                                        // 尝试 1: 使用 libx264 编码器 (H.264)
+                                        const cmdX264 = ffmpegCmd(`-vf "fps=${fps}" -c:v libx264 -pix_fmt yuv420p`);
+                                        exec(cmdX264, (errX264: any) => {
+                                            if (errX264) {
+                                                // 尝试 2: 使用 FFmpeg 内置的原生 mpeg4 编码器
+                                                const cmdMpeg4 = ffmpegCmd(`-vf "fps=${fps}" -c:v mpeg4 -q:v 3 -pix_fmt yuv420p`);
+                                                exec(cmdMpeg4, (errMpeg4: any) => {
+                                                    try { fs.unlinkSync(tempWebmPath); } catch (e) {}
+                                                    if (errMpeg4) {
+                                                        const webmPath = result.filePath.replace(/\.mp4$/i, '.webm');
+                                                        try {
+                                                            fs.writeFileSync(webmPath, Buffer.from(fixedBuffer));
+                                                            Editor.warn('[Record] FFmpeg 转换 MP4 失败，已保存为已修复 WebM 格式。错误信息：', errMpeg4.message);
+                                                        } catch (e: any) {
+                                                            Editor.warn('[Record] 写入本地视频失败:', e.message);
+                                                        }
+                                                    } else {
+                                                        Editor.log('录屏文件已保存到:', result.filePath);
+                                                    }
+                                                });
+                                            } else {
+                                                try { fs.unlinkSync(tempWebmPath); } catch (e) {}
+                                                Editor.log('录屏文件已保存到:', result.filePath);
+                                            }
+                                        });
+                                    } catch (e: any) {
+                                        try { fs.unlinkSync(tempWebmPath); } catch (err) {}
+                                        Editor.warn('[Record] 写入临时文件失败:', e.message);
+                                    }
+                                }
+                            });
+                        }
+                    });
+                } else {
+                    Editor.Ipc.sendToMain('mcp-inspector-bridge:show-save-video-dialog', { ext: 'webm' }, (err: any, result: any) => {
+                        if (err) {
+                            Editor.warn('[Record] 弹出保存框失败:', err.message || err);
+                            return;
+                        }
+                        if (result && !result.canceled && result.filePath) {
+                            try {
+                                const fs = require('fs');
+                                fs.writeFileSync(result.filePath, Buffer.from(fixedBuffer));
+                                Editor.log('录屏文件已保存到:', result.filePath);
+                            } catch (e: any) {
+                                Editor.warn('[Record] 写入本地视频失败:', e.message);
+                            }
+                        }
+                    });
+                }
+            };
+            reader.readAsArrayBuffer(fixedBlob);
+        });
+    };
+
     watch(isShowFPS, (newVal: boolean) => {
         if (newVal) {
             onStartPolling?.();
@@ -464,6 +687,18 @@ export function useGameView(
                     if (nt && typeof nt.selectedId !== 'undefined') {
                         nt.selectedId = '';
                     }
+                } else if (event.channel === 'record-status-changed') {
+                    isRecording.value = !!event.args[0]?.recording;
+                } else if (event.channel === 'record-log') {
+                    if (typeof Editor !== 'undefined') Editor.log('[Record] ' + event.args[0]);
+                } else if (event.channel === 'record-error') {
+                    isRecording.value = false;
+                    if (typeof Editor !== 'undefined') Editor.warn('[Record] 底层录屏发生异常: ' + event.args[0]);
+                } else if (event.channel === 'record-complete') {
+                    isRecording.value = false;
+                    if (event.args[0]) {
+                        handleSaveVideo(event.args[0]);
+                    }
                 }
             });
 
@@ -492,6 +727,10 @@ export function useGameView(
                     } catch (err) { }
                 }
             }) as EventListener);
+
+            gameViewDynamic.addEventListener('did-start-loading', () => {
+                isRecording.value = false;
+            });
 
             gameViewDynamic.addEventListener('dom-ready', () => {
                 if (isAudioMuted.value && typeof gameViewDynamic.setAudioMuted === 'function') {
@@ -563,6 +802,9 @@ export function useGameView(
         toggleFPS,
         toggleMute,
         takeScreenshot,
+        isRecording,
+        startRecord,
+        stopRecord,
         setupGameViewListeners
     };
 }

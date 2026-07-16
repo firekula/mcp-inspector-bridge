@@ -362,9 +362,48 @@ mcp.log('脚本已加载');
                     globalState.inspectorLayout = savedLayout;
                 }
 
+                const savedRecordFps = window.localStorage.getItem('mcp-record-fps');
+                if (savedRecordFps && !isNaN(parseInt(savedRecordFps))) {
+                    globalState.recordFps = parseInt(savedRecordFps, 10);
+                } else {
+                    globalState.recordFps = 30;
+                }
+
+                const savedRecordScale = window.localStorage.getItem('mcp-record-scale');
+                if (savedRecordScale && !isNaN(parseFloat(savedRecordScale))) {
+                    globalState.recordScale = parseFloat(savedRecordScale);
+                } else {
+                    globalState.recordScale = 1.0;
+                }
+
+                const savedRecordFormat = window.localStorage.getItem('mcp-record-format');
+                if (savedRecordFormat) {
+                    globalState.recordFormat = savedRecordFormat;
+                } else {
+                    globalState.recordFormat = 'webm';
+                }
+
                 watch(() => globalState.inspectorLayout, (newVal: string) => {
                     try {
                         window.localStorage.setItem('mcp-inspector-layout', newVal);
+                    } catch(e) {}
+                });
+
+                watch(() => globalState.recordFps, (newVal: number) => {
+                    try {
+                        window.localStorage.setItem('mcp-record-fps', newVal.toString());
+                    } catch(e) {}
+                });
+
+                watch(() => globalState.recordScale, (newVal: number) => {
+                    try {
+                        window.localStorage.setItem('mcp-record-scale', newVal.toString());
+                    } catch(e) {}
+                });
+
+                watch(() => globalState.recordFormat, (newVal: string) => {
+                    try {
+                        window.localStorage.setItem('mcp-record-format', newVal);
                     } catch(e) {}
                 });
 

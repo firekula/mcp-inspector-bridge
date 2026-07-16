@@ -6,6 +6,17 @@
 
 ### ✨ 新特性
 
+- **游戏录屏功能 (Video Recording)**: 在游戏预览区右上角新增半透明录屏按钮（📹），支持一键录像并弹出保存文件窗口。
+  - **录制机制**: 基于 HTML5 `MediaRecorder` API 与 WebGL 渲染缓冲捕获（`canvas.captureStream`）。
+  - **离屏双缓冲缩放 (Offscreen Canvas)**: 支持在偏好设置中自定义分辨率倍率（0.5x、1.0x、1.5x、2.0x）。通过创建后台离屏 Canvas 进行 GPU 双缓冲画面缩放，避免渲染超限并实现高清视频导出。
+  - **偏好设置集成**: 在 ⚙️ 设置面板底部新增 `🎥 录屏设置` 配置，支持对录制帧率（15、24、30、60 FPS）、分辨率倍率以及视频保存格式（WebM / MP4）的设置，并在本地自动持久化保存。
+  - **播放器进度条与寻道自动修复 (EBML Duration Fix)**: 自主实现了对 MediaRecorder 生成的原始 WebM 视频字节流的 EBML 重写算法，在 1ms 内自动计算并注入正确的 Duration 属性，彻底解决了 WebM 视频在主流播放器中“进度条显示异常、实际进度不匹配、无法拖动寻道”的顽疾。
+  - **MP4 兼容性无痛转码与降级机制 (FFmpeg Remux/Transcode)**: 当偏好设置为保存为 MP4 时，在宿主渲染进程中自动检测本地系统是否安装了 `ffmpeg` 工具。
+    - **若存在 FFmpeg**: 自动以高性能 H.264 编码方式重打包转码输出标准的 `.mp4` 文件，完美兼容 QuickTime / Premiere 等全套工具。
+    - **若缺失 FFmpeg**: 自动提示警告并安全回退至已修复进度条寻道的 `.webm` 格式，规避旧版 Electron（Cocos Creator 2.x）由于无 WebCodecs 或原生编解码支持带来的崩溃和卡死风险。
+  - **状态闪烁指示器**: 录制时按钮变更为 ⏹，且伴有红色呼吸渐变（`blink-record`）闪烁提示，提升交互感知。
+  - **涉及文件**: `src/preload.ts`, `src/panel/composables/useGameView.ts`, `src/panel/index.ts`, `src/panel/index.html`, `src/main.ts`
+
 - **组件属性完整提取与打印安全增强 (Complete Component Properties & Serialization Security)**
   - 修复组件类名提取方法以拉取 `@property` 的 `__attrs__` 注册表，恢复 `sp.Skeleton` 与 `dragonBones.ArmatureDisplay` 组件的骨骼资源及其动画、皮肤、骨架的下拉选择功能。
   - 过滤隐藏 `AnimList` 等非标准的冗余属性；并在组件打印序列化中安全拦截 `cc.Component` 引用类型、DOM 元素及全局对象，用 try-catch 防御。

@@ -463,6 +463,10 @@
         white-space: nowrap;
     }
     .target-mark { color: #e06c75; font-size: 12px; opacity: 0.8; }
+    @keyframes blink-record {
+        from { background-color: rgba(244, 67, 54, 0.9); }
+        to { background-color: rgba(244, 67, 54, 0.4); }
+    }
 </style>
 
 <div id="app" v-cloak>
@@ -601,6 +605,32 @@
                        font-size: 16px; line-height: 1;
                        transition: background 0.15s;">
                 📷
+            </div>
+
+            <!-- 录屏按钮：浮于截图按钮下方 -->
+            <div @click="isRecording ? stopRecord() : startRecord()"
+                :title="isRecording ? '停止录屏并保存' : '开始录制游戏画面'"
+                :style="{
+                    position: 'absolute',
+                    top: '44px',
+                    right: '6px',
+                    zIndex: 100,
+                    background: isRecording ? 'rgba(244, 67, 54, 0.9)' : 'rgba(30, 30, 30, 0.8)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '4px',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    fontSize: '16px',
+                    lineHeight: '1',
+                    transition: 'background 0.15s',
+                    animation: isRecording ? 'blink-record 1s infinite alternate' : 'none'
+                }">
+                {{ isRecording ? '⏹' : '📹' }}
             </div>
         </div>
     </div>
@@ -1245,6 +1275,50 @@
                         <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;">
                             <input type="radio" v-model="globalState.inspectorLayout" value="vertical"> 纵向并排 (上下)
                         </label>
+                    </div>
+                </div>
+
+                <div
+                    style="margin-bottom: 20px; background: #252525; padding: 12px; border-radius: 4px; border: 1px solid #333;">
+                    <div style="font-size: var(--base-font-size, 13px); font-weight: bold; margin-bottom: 8px;">🎥 录屏设置
+                    </div>
+                    <div style="font-size: calc(var(--base-font-size, 13px) - 1px); color: #aaa; margin-bottom: 10px;">
+                        配置视频录制帧率及导出分辨率倍率（以当前窗口分辨率计算）。</div>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <!-- 帧率设置 -->
+                        <div style="display: flex; align-items: center; gap: 15px; font-size: var(--base-font-size, 13px);">
+                            <span style="color: #aaa; width: 100px;">录制帧率:</span>
+                            <select v-model.number="globalState.recordFps"
+                                style="background:#111; color:#fff; padding:4px; border-radius: 3px; border:1px solid #555; width: 110px; font-size: calc(var(--base-font-size, 13px) - 1px);">
+                                <option :value="15">15 FPS</option>
+                                <option :value="24">24 FPS</option>
+                                <option :value="30">30 FPS (默认)</option>
+                                <option :value="60">60 FPS</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 分辨率倍率 -->
+                        <div style="display: flex; align-items: center; gap: 15px; font-size: var(--base-font-size, 13px);">
+                            <span style="color: #aaa; width: 100px;">分辨率倍率:</span>
+                            <select v-model.number="globalState.recordScale"
+                                style="background:#111; color:#fff; padding:4px; border-radius: 3px; border:1px solid #555; width: 110px; font-size: calc(var(--base-font-size, 13px) - 1px);">
+                                <option :value="0.5">0.5x</option>
+                                <option :value="1.0">1.0x (原始)</option>
+                                <option :value="1.5">1.5x</option>
+                                <option :value="2.0">2.0x (高清)</option>
+                            </select>
+                        </div>
+
+                        <!-- 视频保存格式 -->
+                        <div style="display: flex; align-items: center; gap: 15px; font-size: var(--base-font-size, 13px);">
+                            <span style="color: #aaa; width: 100px;">保存格式:</span>
+                            <select v-model="globalState.recordFormat"
+                                style="background:#111; color:#fff; padding:4px; border-radius: 3px; border:1px solid #555; width: 110px; font-size: calc(var(--base-font-size, 13px) - 1px);">
+                                <option value="webm">WebM (.webm)</option>
+                                <option value="mp4">MP4 (.mp4)</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
