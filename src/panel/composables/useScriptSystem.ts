@@ -67,6 +67,20 @@ export function useScriptSystem(
     registerMcpTool: (tool: any) => void,
     unregisterMcpTool: (name: string) => void
 ) {
+    // 全局注入拦截 window.cc 属性访问，防御外层通过 window.cc 误用引擎 API
+    if (typeof window !== 'undefined' && !('cc' in window)) {
+        try {
+            Object.defineProperty(window, 'cc', {
+                get() {
+                    throw new Error(`[McpScript] 无法在面板侧（脚本外层作用域）直接使用 window.cc。如需调用 Cocos Creator 引擎 API，请在 mcp.runInGame(...) 闭包中调用。`);
+                },
+                configurable: true
+            });
+        } catch (e) {
+            // 忽略由于环境限制可能产生的报错
+        }
+    }
+
     const _scripts: Map<string, ScriptEntry> = new Map();
 
     function buildMcpApi(entry: ScriptEntry): any {
@@ -199,15 +213,28 @@ export function useScriptSystem(
 
         const mcp = buildMcpApi(entry);
 
-        const bodyCode = code.slice(bodyStart);
+        // 局部变量 cc 拦截代理
+        const ccProxy = new Proxy({}, {
+            get(target, prop) {
+                throw new Error(`[McpScript] 无法在面板侧（脚本外层作用域）直接使用 cc。如需调用 Cocos Creator 引擎 API，请在 mcp.runInGame(...) 闭包中调用。`);
+            },
+            set(target, prop, value) {
+                throw new Error(`[McpScript] 无法在面板侧（脚本外层作用域）直接使用 cc。如需调用 Cocos Creator 引擎 API，请在 mcp.runInGame(...) 闭包中调用。`);
+            }
+        });
+
+        // 拼接虚拟源映射文件名，方便控制台报错时精确定位错误位置
+        const bodyCode = code.slice(bodyStart) + `\n//# sourceURL=mcp-script:///${fileName}`;
         try {
-            const fn = new Function('mcp', bodyCode);
-            fn(mcp);
+            // 通过 'cc' 形参遮蔽了全局的 cc，传入 ccProxy 进行拦截
+            const fn = new Function('mcp', 'cc', bodyCode);
+            fn(mcp, ccProxy);
         } catch (e: any) {
             entry.status = 'error';
-            entry.errorMsg = e.message;
+            // 保留完整的堆栈调用信息，利于用户调试
+            entry.errorMsg = e.stack || e.message;
             syncToState();
-            return { success: false, error: e.message };
+            return { success: false, error: entry.errorMsg };
         }
 
         syncToState();
