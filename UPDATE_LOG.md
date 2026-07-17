@@ -1,6 +1,21 @@
 # 更新日志 (Update Log)
 
 本项目记录 `mcp-inspector-bridge` 的重大里程碑、架构变更与缺陷修复记录。
+## [Unreleased] - 2026-07-17
+
+### ✨ 新特性
+
+- **MCP 脚本系统 cc 变量安全拦截 (MCP Script cc Interception)**：针对面板侧（编辑器进程）运行脚本时误用 Cocos Creator 运行时 API 的问题，引入双重拦截防御机制：
+  - **局部形参遮蔽**：在加载脚本时，将 `new Function` 改为接收 `'cc'` 形参并绑定至 `ccProxy` 代理对象，对外层任何直接使用 `cc` 的行为进行安全拦截。
+  - **全局属性监听**：在面板侧全局 `window` 上配置只读的 `cc` 拦截属性，防御在脚本外层直接调用 `window.cc.xxx`。
+  - **友好中文报错**：拦截后会抛出详细的指导性错误（如提示“无法在面板侧直接使用 cc，请在 mcp.runInGame 闭包中调用”），且面板侧展示完整错误堆栈。
+- **调试定位优化 (Source Map Mapping)**：在执行的用户脚本尾部自动注入 `//# sourceURL=mcp-script:///${fileName}`，使控制台错误堆栈能够直接定位至具体的脚本文件名和错误行号，并支持 Chrome DevTools 打断点调试。
+
+### 🧹 测试与整理
+
+- **本地模拟测试套件**：新增 `scratch/test-script-runner.ts` 模拟测试沙箱，覆盖对合法脚本、外层误用 `cc`、外层误用 `window.cc` 三大场景的自动化拦截测试。
+
+---
 
 ## [Unreleased] - 2026-07-09
 
