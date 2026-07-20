@@ -466,6 +466,25 @@ module.exports = {
             } catch (e: any) {
                 if (event.reply) event.reply(e);
             }
+        },
+        'psd-save-file'(event: any, args: { defaultName: string; bufferArray: number[] }) {
+            const { dialog } = require('electron');
+            const fs = require('fs');
+            dialog.showSaveDialog({
+                title: '导出 PSD 布局文件',
+                defaultPath: args.defaultName,
+                filters: [{ name: 'Photoshop PSD', extensions: ['psd'] }],
+            }).then((result: any) => {
+                if (result.canceled || !result.filePath) {
+                    if (event.reply) event.reply(null, { canceled: true });
+                    return;
+                }
+                const buf = Buffer.from(args.bufferArray);
+                fs.writeFileSync(result.filePath, buf);
+                if (event.reply) event.reply(null, { success: true, filePath: result.filePath });
+            }).catch((e: any) => {
+                if (event.reply) event.reply(e);
+            });
         }
     },
 };

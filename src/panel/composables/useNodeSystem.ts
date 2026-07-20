@@ -365,6 +365,145 @@ export function useNodeSystem(globalState: any, gameView: any, nodeTreeRef: any,
         window.removeEventListener('panel-show', _onPanelShow);
     });
 
+    const exportNodeAsPsd = async (uuid: string, nodeName: string) => {
+        const wv: any = gameView.value;
+        if (!isWebViewReady(wv)) {
+            if (typeof Editor !== 'undefined') Editor.warn('[PSD Export] WebView 未就绪');
+            return;
+        }
+
+        if (typeof Editor !== 'undefined') Editor.log(`[PSD Export] 1. 开始导出节点: ${nodeName} (${uuid})`);
+
+        const code = `window.__mcpCrawler ? window.__mcpCrawler.exportNodeAsPsdData('${uuid}') : null`;
+        try {
+            if (typeof Editor !== 'undefined') Editor.log(`[PSD Export] 2. 正在向 WebView 发送脚本抓取节点数据...`);
+            const res = await wv.executeJavaScript(code);
+            if (!res) {
+                if (typeof Editor !== 'undefined') Editor.warn('[PSD Export] 获取节点栅格化数据失败：WebView 返回空数据');
+                return;
+            }
+            
+            if (typeof Editor !== 'undefined') Editor.log(`[PSD Export] 3. 成功获取 WebView 数据, 字节长度: ${res.length}`);
+            const parsedData = JSON.parse(res);
+            const { width, height, layers } = parsedData;
+            if (!layers || layers.length === 0) {
+                if (typeof Editor !== 'undefined') Editor.warn('[PSD Export] 没有可以导出的图层（可能图层没有渲染组件或未激活）');
+                return;
+            }
+
+            if (typeof Editor !== 'undefined') Editor.log(`[PSD Export] 4. 解析图层结构成功: 设计分辨率为 ${width}x${height}, 图层数量: ${layers.length}`);
+
+            // 1. 异步加载所有图层 Base64 图片
+            const loadImg = (base64Str: string, name: string): Promise<HTMLImageElement | null> => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        if (typeof Editor !== 'undefined') Editor.log(`[PSD Export] - 成功加载图片数据: ${name} (尺寸: ${img.width}x${img.height})`);
+                        resolve(img);
+                    };
+                    img.onerror = (e) => {
+                        if (typeof Editor !== 'undefined') Editor.error(`[PSD Export] - 图片数据加载失败: ${name}`);
+                        resolve(null);
+                    };
+                    img.src = base64Str;
+                });
+            };
+
+            if (typeof Editor !== 'undefined') Editor.log(`[PSD Export] 5. 正在异步载入所有 Base64 图片资源...`);
+            const loadedLayers = await Promise.all(layers.map(async (layer: any, idx: number) => {
+                if (layer.imageBase64) {
+                    const img = await loadImg(layer.imageBase64, `${layer.name || 'Unnamed'}[${idx}]`);
+                    return { ...layer, img };
+                }
+                return { ...layer, img: null };
+            }));
+
+            // 2. 引入 ag-psd 进行打包装包
+            if (typeof Editor !== 'undefined') Editor.log(`[PSD Export] 6. 正在构建 PSD 树形图层结构...`);
+            const { writePsd } = require('ag-psd');
+            const psdChildren: any[] = [];
+            const stack = [psdChildren];
+
+            let imageCount = 0;
+            let groupCount = 0;
+
+            for (const item of loadedLayers) {
+                if (item.type === 'group') {
+                    groupCount++;
+                    const groupNode = {
+                        name: item.name,
+                        opened: true,
+                        children: [] as any[],
+                        opacity: item.opacity / 255
+                    };
+                    stack[stack.length - 1].push(groupNode);
+                    stack.push(groupNode.children);
+                } else if (item.type === 'group_end') {
+                    stack.pop();
+                } else if (item.type === 'image') {
+                    if (!item.img) {
+                        if (typeof Editor !== 'undefined') Editor.warn(`[PSD Export] 忽略空图像图层: ${item.name}`);
+                        continue;
+                    }
+                    imageCount++;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = item.width;
+                    canvas.height = item.height;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        ctx.drawImage(item.img, 0, 0);
+                    }
+                    
+                    if (typeof Editor !== 'undefined') {
+                        Editor.log(`[PSD Export] - 放置图片图层: ${item.name}, left: ${item.left}, top: ${item.top}, width: ${item.width}, height: ${item.height}`);
+                    }
+                    
+                    stack[stack.length - 1].push({
+                        name: item.name,
+                        canvas: canvas,
+                        left: item.left,
+                        top: item.top,
+                        opacity: item.opacity / 255
+                    });
+                }
+            }
+
+            if (typeof Editor !== 'undefined') Editor.log(`[PSD Export] 7. 树形构建完成: 图层组(文件夹)数: ${groupCount}, 图像图层数: ${imageCount}`);
+
+            const psdConfig = {
+                width: width,
+                height: height,
+                children: psdChildren
+            };
+
+            if (typeof Editor !== 'undefined') Editor.log(`[PSD Export] 8. 正在通过 ag-psd 序列化为 PSD ArrayBuffer...`);
+            const psdBuffer = writePsd(psdConfig);
+            if (typeof Editor !== 'undefined') Editor.log(`[PSD Export] 9. 序列化成功, Buffer 大小: ${psdBuffer.byteLength} 字节`);
+            
+            // 3. 将 Uint8Array/Buffer 发送给主进程完成系统对话框保存
+            if (typeof Editor !== 'undefined') {
+                const arr = Array.from(new Uint8Array(psdBuffer));
+                Editor.log(`[PSD Export] 10. 正在发送保存指令到主进程...`);
+                Editor.Ipc.sendToMain('mcp-inspector-bridge:psd-save-file', 
+                    { defaultName: `${nodeName}.psd`, bufferArray: arr }, 
+                    (err: any, reply: any) => {
+                        if (err) {
+                            Editor.error('[PSD Export] 保存文件时主进程报错:', err.message || err);
+                            return;
+                        }
+                        if (reply && reply.success) {
+                            Editor.log(`[PSD Export] 11. PSD 成功保存至: ${reply.filePath}`);
+                        } else if (reply && reply.canceled) {
+                            Editor.log(`[PSD Export] 用户取消了保存操作`);
+                        }
+                    }
+                );
+            }
+        } catch (e: any) {
+            if (typeof Editor !== 'undefined') Editor.error('[PSD Export] 导出异常:', e.stack || e.message || e);
+        }
+    };
+
     return {
         onNodeSelect,
         onNodeHover,
@@ -376,6 +515,7 @@ export function useNodeSystem(globalState: any, gameView: any, nodeTreeRef: any,
         onLocateNode,
         onLocateAsset,
         onPrintComp,
-        onPrintNode
+        onPrintNode,
+        exportNodeAsPsd
     };
 }

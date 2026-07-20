@@ -686,7 +686,7 @@
                         <node-inspector :node-detail="globalState.nodeDetail" @update-prop="onUpdateNodeProp"
                             @hover-change="globalState.isInspectorHovered = $event" @focus-change="globalState.isInspectorFocused = $event" @locate-node="onLocateNode"
                             @locate-asset="onLocateAsset" @print-comp="onPrintComp"
-                            @print-node="onPrintNode"></node-inspector>
+                            @print-node="onPrintNode" @export-psd="exportNodeAsPsd"></node-inspector>
                         <div v-show="isNodeTreeDragging" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 99;"></div>
                     </div>
                 </div>

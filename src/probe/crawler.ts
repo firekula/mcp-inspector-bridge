@@ -727,6 +727,620 @@ export function initCrawler() {
             }
 
             return { success: true, msg: 'Simulated ' + mode + ' from ' + targetSource + ' -> Screen DOM (' + Math.round(clientX) + 'px, ' + Math.round(clientY) + 'px)' };
+        },
+        exportNodeAsPsdData: function(uuid) {
+            const rootNode = this.findNodeByUuid(uuid);
+            if (!rootNode) return null;
+            
+            const exportList = [];
+            const rootWidth = rootNode.width;
+            const rootHeight = rootNode.height;
+            const rootAnchorX = rootNode.anchorX;
+            const rootAnchorY = rootNode.anchorY;
+
+            // 获取 Texture2D 的 HTML 元素或从 WebGL 读取像素生成 Canvas
+            function getTextureCanvasOrImage(texture) {
+                if (!texture) return null;
+                const img = (texture.getHtmlElementObj && texture.getHtmlElementObj()) || 
+                            (texture.getHtmlElement && texture.getHtmlElement()) ||
+                            texture.image;
+                if (img) {
+                    // 验证 Image/Canvas 元素是否包含有效数据，且未被回收 (naturalWidth !== 0)
+                    const isValid = img.width > 0 && img.height > 0 && img.naturalWidth !== 0;
+                    if (isValid) {
+                        return img;
+                    }
+                }
+
+                try {
+                    const eng = window.cc;
+                    const gl = eng.game._renderContext;
+                    if (!gl) return null;
+                    const textureImpl = texture._texture || (texture.getHtmlElementObj && texture.getHtmlElementObj());
+                    if (!textureImpl) return null;
+                    const glID = textureImpl._glID || texture._glID;
+                    if (!glID) return null;
+
+                    const fbo = gl.createFramebuffer();
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+                    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, glID, 0);
+                    
+                    const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+                    if (status !== gl.FRAMEBUFFER_COMPLETE) {
+                        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                        gl.deleteFramebuffer(fbo);
+                        return null;
+                    }
+
+                    const w = texture.width;
+                    const h = texture.height;
+                    const pixels = new Uint8Array(w * h * 4);
+                    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                    gl.deleteFramebuffer(fbo);
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) return null;
+
+                    const imgData = ctx.createImageData(w, h);
+                    imgData.data.set(pixels);
+                    ctx.putImageData(imgData, 0, 0);
+
+                    // 注意：Cocos 中正常 Texture2D 在 GPU 里的存储方向使得 readPixels 读取后已经是正向，不需要再次垂直翻转
+                    return canvas;
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            // 1. 局部 AABB 包围盒计算（转换为 PSD 相对坐标系，支持相对角度和缩放提取）
+            function getRelativeTransform(node) {
+                let width = node.width || 0;
+                let height = node.height || 0;
+
+                // 兼容 Sprite 的 SizeMode 实际渲染宽高：如果在 TRIMMED 或 RAW 模式，用图片原始宽高计算包围盒，防止裁剪
+                const sprite = node.getComponent(window.cc.Sprite);
+                if (sprite && sprite.spriteFrame && (sprite.sizeMode === 1 || sprite.sizeMode === 2)) {
+                    const originalSize = sprite.spriteFrame.getOriginalSize();
+                    width = originalSize.width;
+                    height = originalSize.height;
+                }
+
+                const ax = node.anchorX !== undefined ? node.anchorX : 0.5;
+                const ay = node.anchorY !== undefined ? node.anchorY : 0.5;
+
+                const ptLeft = -ax * width;
+                const ptRight = (1 - ax) * width;
+                const ptBottom = -ay * height;
+                const ptTop = (1 - ay) * height;
+
+                const eng = window.cc;
+                const bl = node.convertToWorldSpaceAR(eng.v2(ptLeft, ptBottom));
+                const br = node.convertToWorldSpaceAR(eng.v2(ptRight, ptBottom));
+                const tr = node.convertToWorldSpaceAR(eng.v2(ptRight, ptTop));
+                const tl = node.convertToWorldSpaceAR(eng.v2(ptLeft, ptTop));
+
+                const blLocal = rootNode.convertToNodeSpaceAR(bl);
+                const brLocal = rootNode.convertToNodeSpaceAR(br);
+                const trLocal = rootNode.convertToNodeSpaceAR(tr);
+                const tlLocal = rootNode.convertToNodeSpaceAR(tl);
+
+                const toPsd = (pt) => ({
+                    x: pt.x + rootAnchorX * rootWidth,
+                    y: rootHeight - (pt.y + rootAnchorY * rootHeight)
+                });
+
+                const blPsd = toPsd(blLocal);
+                const brPsd = toPsd(brLocal);
+                const trPsd = toPsd(trLocal);
+                const tlPsd = toPsd(tlLocal);
+
+                const left = Math.min(blPsd.x, brPsd.x, trPsd.x, tlPsd.x);
+                const top = Math.min(blPsd.y, brPsd.y, trPsd.y, tlPsd.y);
+                const right = Math.max(blPsd.x, brPsd.x, trPsd.x, tlPsd.x);
+                const bottom = Math.max(blPsd.y, brPsd.y, trPsd.y, tlPsd.y);
+
+                // 计算相对 rootNode 的旋转与缩放，考虑镜像翻转
+                let localScaleX = 1;
+                let localScaleY = 1;
+                if ('scale' in node && typeof node.scale === 'object') {
+                    localScaleX = node.scale.x;
+                    localScaleY = node.scale.y;
+                } else {
+                    localScaleX = node.scaleX !== undefined ? node.scaleX : 1;
+                    localScaleY = node.scaleY !== undefined ? node.scaleY : 1;
+                }
+
+                const signX = Math.sign(localScaleX) || 1;
+                const signY = Math.sign(localScaleY) || 1;
+
+                const dx = (brPsd.x - blPsd.x) * signX;
+                const dy = (brPsd.y - blPsd.y) * signX;
+                const angleRelative = Math.atan2(dy, dx);
+                
+                const lenX = Math.sqrt(dx * dx + dy * dy);
+                const scaleXRelative = width > 0 ? (lenX / width) : 1;
+                
+                const dyY = (tlPsd.y - blPsd.y) * signY;
+                const dxY = (tlPsd.x - blPsd.x) * signY;
+                const lenY = Math.sqrt(dxY * dxY + dyY * dyY);
+                const scaleYRelative = height > 0 ? (lenY / height) : 1;
+
+                const sx = localScaleX < 0 ? -scaleXRelative : scaleXRelative;
+                const sy = localScaleY < 0 ? -scaleYRelative : scaleYRelative;
+
+                return {
+                    box: {
+                        left: Math.round(left),
+                        top: Math.round(top),
+                        width: Math.round(Math.max(1, right - left)),
+                        height: Math.round(Math.max(1, bottom - top))
+                    },
+                    angle: angleRelative,
+                    scaleX: sx,
+                    scaleY: sy
+                };
+            }
+
+            // 2. Sprite 纹理像素提取与缩放/旋转变换
+            function rasterizeSprite(sprite, transform) {
+                if (!sprite || !sprite.spriteFrame) return null;
+                const spriteFrame = sprite.spriteFrame;
+                const texture = spriteFrame.getTexture();
+                if (!texture) return null;
+                const img = getTextureCanvasOrImage(texture);
+                if (!img) return null;
+
+                const { box, angle, scaleX, scaleY } = transform;
+
+                const canvas = document.createElement('canvas');
+                canvas.width = box.width;
+                canvas.height = box.height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return null;
+
+                const rect = spriteFrame.getRect();
+                const rotated = spriteFrame.isRotated();
+                const offset = spriteFrame.getOffset();
+                const originalSize = spriteFrame.getOriginalSize();
+
+                // 判断是否需要应用空白剔除的裁剪边距 (Trim)
+                // Cocos Creator 在 trim 启用且不是九宫格(Type.SLICED)的情况下才会保留透明边距
+                const useTrim = sprite.trim && sprite.type !== 1;
+
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                if (!tempCtx) return null;
+
+                if (useTrim) {
+                    const origW = Math.max(2, originalSize.width) || 2;
+                    const origH = Math.max(2, originalSize.height) || 2;
+                    tempCanvas.width = origW;
+                    tempCanvas.height = origH;
+
+                    tempCtx.save();
+                    if (rotated) {
+                        const cx = origW / 2 + offset.x;
+                        const cy = origH / 2 - offset.y;
+                        tempCtx.translate(cx, cy);
+                        tempCtx.rotate(-Math.PI / 2);
+                        // 修正：无论旋转与否，在图集中裁剪的原始尺寸都是 rect.width 和 rect.height
+                        tempCtx.drawImage(img, rect.x, rect.y, rect.width, rect.height, -rect.height / 2, -rect.width / 2, rect.height, rect.width);
+                    } else {
+                        const dx = origW / 2 - rect.width / 2 + offset.x;
+                        const dy = origH / 2 - rect.height / 2 - offset.y;
+                        tempCtx.drawImage(img, rect.x, rect.y, rect.width, rect.height, dx, dy, rect.width, rect.height);
+                    }
+                    tempCtx.restore();
+                } else {
+                    // 如果不使用 trim，直接渲染原图切片本身，不补充 transparent 外边距
+                    const rectW = Math.max(2, rect.width) || 2;
+                    const rectH = Math.max(2, rect.height) || 2;
+                    tempCanvas.width = rectW;
+                    tempCanvas.height = rectH;
+
+                    tempCtx.save();
+                    if (rotated) {
+                        tempCtx.translate(rectW / 2, rectH / 2);
+                        tempCtx.rotate(-Math.PI / 2);
+                        // 修正：无论旋转与否，在图集中裁剪的原始尺寸都是 rect.width 和 rect.height
+                        tempCtx.drawImage(img, rect.x, rect.y, rect.width, rect.height, -rect.height / 2, -rect.width / 2, rect.height, rect.width);
+                    } else {
+                        tempCtx.drawImage(img, rect.x, rect.y, rect.width, rect.height, 0, 0, rect.width, rect.height);
+                    }
+                    tempCtx.restore();
+                }
+
+                const nodeWorldCenter = sprite.node.convertToWorldSpaceAR(window.cc.v2(0, 0));
+                const nodeLocalCenter = rootNode.convertToNodeSpaceAR(nodeWorldCenter);
+                const nodePsdCenter = {
+                    x: nodeLocalCenter.x + rootAnchorX * rootWidth,
+                    y: rootHeight - (nodeLocalCenter.y + rootAnchorY * rootHeight)
+                };
+                const rx = nodePsdCenter.x - box.left;
+                const ry = nodePsdCenter.y - box.top;
+
+                ctx.translate(rx, ry);
+                ctx.rotate(angle);
+                ctx.scale(scaleX, scaleY);
+
+                const ax = sprite.node.anchorX;
+                const ay = sprite.node.anchorY;
+                ctx.globalAlpha = (sprite.node.opacity !== undefined ? sprite.node.opacity : 255) / 255;
+                
+                let drawW = sprite.node.width;
+                let drawH = sprite.node.height;
+
+                // 如果 sizeMode 是 TRIMMED 或 RAW，则使用图集定义的原始宽高防止拉伸变形
+                if (sprite.sizeMode === 1 || sprite.sizeMode === 2) {
+                    const originalSize = spriteFrame.getOriginalSize();
+                    drawW = originalSize.width;
+                    drawH = originalSize.height;
+                }
+
+                // 9宫格绘制辅助函数
+                function drawNineSlice(targetCtx, srcCanvas, w, h, ax, ay, insetL, insetR, insetT, insetB) {
+                    const imgW = srcCanvas.width;
+                    const imgH = srcCanvas.height;
+                    const x = -ax * w;
+                    const y = -(1 - ay) * h;
+
+                    const sL = insetL;
+                    const sR = insetR;
+                    const sT = insetT;
+                    const sB = insetB;
+                    const sMidW = imgW - sL - sR;
+                    const sMidH = imgH - sT - sB;
+
+                    const dL = sL;
+                    const dR = sR;
+                    const dT = sT;
+                    const dB = sB;
+                    const dMidW = w - dL - dR;
+                    const dMidH = h - dT - dB;
+
+                    const drawPart = (sx, sy, sw, sh, dx, dy, dw, dh) => {
+                        if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0) return;
+                        targetCtx.drawImage(srcCanvas, sx, sy, sw, sh, dx, dy, dw, dh);
+                    };
+
+                    // Top row
+                    drawPart(0, 0, sL, sT, x, y, dL, dT); // Top-Left
+                    drawPart(sL, 0, sMidW, sT, x + dL, y, dMidW, dT); // Top-Center
+                    drawPart(imgW - sR, 0, sR, sT, x + w - dR, y, dR, dT); // Top-Right
+
+                    // Middle row
+                    drawPart(0, sT, sL, sMidH, x, y + dT, dL, dMidH); // Middle-Left
+                    drawPart(sL, sT, sMidW, sMidH, x + dL, y + dT, dMidW, dMidH); // Center
+                    drawPart(imgW - sR, sT, sR, sMidH, x + w - dR, y + dT, dR, dMidH); // Middle-Right
+
+                    // Bottom row
+                    drawPart(0, imgH - sB, sL, sB, x, y + h - dB, dL, dB); // Bottom-Left
+                    drawPart(sL, imgH - sB, sMidW, sB, x + dL, y + h - dB, dMidW, dB); // Bottom-Center
+                    drawPart(imgW - sR, imgH - sB, sR, sB, x + w - dR, y + h - dB, dR, dB); // Bottom-Right
+                }
+
+                const isSliced = sprite.type === 1; // 1 为 cc.Sprite.Type.SLICED
+                const hasInsets = (spriteFrame.insetLeft > 0 || spriteFrame.insetRight > 0 || spriteFrame.insetTop > 0 || spriteFrame.insetBottom > 0);
+
+                if (isSliced && hasInsets) {
+                    drawNineSlice(ctx, tempCanvas, drawW, drawH, ax, ay, 
+                                  spriteFrame.insetLeft, spriteFrame.insetRight, 
+                                  spriteFrame.insetTop, spriteFrame.insetBottom);
+                } else {
+                    ctx.drawImage(tempCanvas, -ax * drawW, -(1 - ay) * drawH, drawW, drawH);
+                }
+
+                const color = sprite.node.color;
+                if (color && (color.r !== 255 || color.g !== 255 || color.b !== 255)) {
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'source-atop';
+                    ctx.fillStyle = `rgb(${color.r},${color.g},${color.b})`;
+                    ctx.fillRect(-ax * drawW, -(1 - ay) * drawH, drawW, drawH);
+                    ctx.restore();
+                }
+
+                return canvas.toDataURL('image/png');
+            }
+
+            // 3. Label 文字栅格化
+            function rasterizeLabel(label, transform) {
+                if (!label || !label.string) return null;
+                const { box, angle, scaleX, scaleY } = transform;
+
+                const canvas = document.createElement('canvas');
+                canvas.width = box.width;
+                canvas.height = box.height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return null;
+
+                const nodeWorldCenter = label.node.convertToWorldSpaceAR(window.cc.v2(0, 0));
+                const nodeLocalCenter = rootNode.convertToNodeSpaceAR(nodeWorldCenter);
+                const nodePsdCenter = {
+                    x: nodeLocalCenter.x + rootAnchorX * rootWidth,
+                    y: rootHeight - (nodeLocalCenter.y + rootAnchorY * rootHeight)
+                };
+                const rx = nodePsdCenter.x - box.left;
+                const ry = nodePsdCenter.y - box.top;
+
+                ctx.translate(rx, ry);
+                ctx.rotate(angle);
+                ctx.scale(scaleX, scaleY);
+
+                const fontSize = label.fontSize || 20;
+                let fontFamily = label.fontFamily || 'Arial';
+                
+                // 解决自定义 TTF 字体映射
+                if (label.font && !label.useSystemFont) {
+                    fontFamily = label.font._fontFamily || label.font.name || label.font._name || fontFamily;
+                }
+                
+                ctx.font = `${fontSize}px ${fontFamily}`;
+
+                let textX = 0;
+                let textAlign = 'center';
+                const ax = label.node.anchorX !== undefined ? label.node.anchorX : 0.5;
+                const width = label.node.width || 0;
+
+                // 核心算法修正：计算相对于 Canvas 边界盒的绝对 X 位置而非直接在 0 处绘制
+                if (label.horizontalAlign === 0) {
+                    textAlign = 'left';
+                    textX = -ax * width;
+                } else if (label.horizontalAlign === 2) {
+                    textAlign = 'right';
+                    textX = (1 - ax) * width;
+                } else {
+                    textAlign = 'center';
+                    textX = (0.5 - ax) * width;
+                }
+                ctx.textAlign = textAlign;
+
+                const ay = label.node.anchorY !== undefined ? label.node.anchorY : 0.5;
+                const height = label.node.height || 0;
+
+                // 换行拆分与自动包装算法
+                const lines = [];
+                if (label.enableWrapText && label.overflow !== 0 && width > 0) {
+                    const rawString = label.string;
+                    let currentLine = '';
+                    for (let i = 0; i < rawString.length; i++) {
+                        const char = rawString[i];
+                        if (char === '\n') {
+                            lines.push(currentLine);
+                            currentLine = '';
+                            continue;
+                        }
+                        const testLine = currentLine + char;
+                        const metrics = ctx.measureText(testLine);
+                        if (metrics.width > width && currentLine !== '') {
+                            lines.push(currentLine);
+                            currentLine = char;
+                        } else {
+                            currentLine = testLine;
+                        }
+                    }
+                    if (currentLine !== '') {
+                        lines.push(currentLine);
+                    }
+                } else {
+                    lines.push(...label.string.split('\n'));
+                }
+
+                const lineHeight = label.lineHeight || fontSize * 1.25;
+                const totalHeight = lines.length * lineHeight;
+
+                let startY = 0;
+                const verticalAlign = label.verticalAlign;
+                if (verticalAlign === 0) {
+                    startY = -(1 - ay) * height;
+                } else if (verticalAlign === 2) {
+                    startY = ay * height - totalHeight;
+                } else {
+                    startY = -(0.5 - ay) * height - totalHeight / 2;
+                }
+
+                ctx.textBaseline = 'top';
+
+                const color = label.node.color || {r: 255, g: 255, b: 255};
+                ctx.fillStyle = `rgb(${color.r},${color.g},${color.b})`;
+                ctx.globalAlpha = (label.node.opacity !== undefined ? label.node.opacity : 255) / 255;
+
+                const outline = label.node.getComponent(window.cc.LabelOutline);
+                for (let i = 0; i < lines.length; i++) {
+                    const lineY = startY + i * lineHeight;
+                    if (outline && outline.enabled) {
+                        ctx.strokeStyle = `rgb(${outline.color.r},${outline.color.g},${outline.color.b})`;
+                        ctx.lineWidth = outline.width * 2;
+                        ctx.strokeText(lines[i], textX, lineY);
+                    }
+                    ctx.fillText(lines[i], textX, lineY);
+                }
+                return canvas.toDataURL('image/png');
+            }
+
+            // 3.5 Skeletal 骨骼动画 (Spine/DragonBones) 节点相机截图
+            function rasterizeSkeletal(node, transform) {
+                const eng = window.cc;
+                const width = Math.max(2, Math.round(node.width)) || 2;
+                const height = Math.max(2, Math.round(node.height)) || 2;
+
+                const scene = eng.director.getScene();
+                if (!scene) return null;
+
+                let cameraNode = null;
+                let rt = null;
+                try {
+                    cameraNode = new eng.Node();
+                    node.addChild(cameraNode);
+
+                    const ax = node.anchorX !== undefined ? node.anchorX : 0.5;
+                    const ay = node.anchorY !== undefined ? node.anchorY : 0.5;
+                    cameraNode.setPosition((0.5 - ax) * width, (0.5 - ay) * height);
+
+                    const camera = cameraNode.addComponent(eng.Camera);
+                    camera.ortho = true;
+                    camera.orthoSize = height / 2;
+                    camera.clearFlags = eng.Camera.ClearFlags.COLOR;
+                    camera.backgroundColor = new eng.Color(0, 0, 0, 0);
+
+                    rt = new eng.RenderTexture();
+                    rt.initWithSize(width, height);
+                    camera.targetTexture = rt;
+
+                    // 立即手动渲染该节点及其子树
+                    camera.render(node);
+
+                    const pixels = rt.readPixels();
+                    if (!pixels || pixels.length === 0) return null;
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) return null;
+
+                    const imgData = ctx.createImageData(width, height);
+                    imgData.data.set(pixels);
+                    ctx.putImageData(imgData, 0, 0);
+
+                    const flipCanvas = document.createElement('canvas');
+                    flipCanvas.width = width;
+                    flipCanvas.height = height;
+                    const flipCtx = flipCanvas.getContext('2d');
+                    if (flipCtx) {
+                        flipCtx.translate(0, height);
+                        flipCtx.scale(1, -1);
+                        flipCtx.drawImage(canvas, 0, 0);
+                        return flipCanvas.toDataURL('image/png');
+                    }
+                    return canvas.toDataURL('image/png');
+                } catch (e) {
+                    return null;
+                } finally {
+                    if (cameraNode) {
+                        cameraNode.removeFromParent();
+                        cameraNode.destroy();
+                    }
+                    if (rt) {
+                        rt.destroy();
+                    }
+                }
+            }
+
+            // 4. DFS 遍历生成
+            function traverse(node, results) {
+                if (!node || node.active === false) return;
+                
+                let hasChildren = node.childrenCount > 0;
+                let sprite = node.getComponent(window.cc.Sprite);
+                let label = node.getComponent(window.cc.Label);
+                
+                // 检测是否为骨骼动画节点
+                let isSkeletal = false;
+                const eng = window.cc;
+                if (window.sp && window.sp.Skeleton && node.getComponent(window.sp.Skeleton)) {
+                    isSkeletal = true;
+                } else if (window.dragonBones && window.dragonBones.ArmatureDisplay && node.getComponent(window.dragonBones.ArmatureDisplay)) {
+                    isSkeletal = true;
+                } else {
+                    const comps = node._components || [];
+                    for (let i = 0; i < comps.length; i++) {
+                        if (comps[i] && comps[i].constructor) {
+                            const name = comps[i].constructor.name;
+                            if (name === 'Skeleton' || name === 'ArmatureDisplay') {
+                                isSkeletal = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (hasChildren) {
+                    // 为容器节点创建组文件夹
+                    results.push({
+                        name: node.name,
+                        type: 'group',
+                        left: 0, top: 0, width: 0, height: 0,
+                        opacity: node.opacity !== undefined ? node.opacity : 255,
+                        visible: node.active !== false
+                    });
+
+                    // 如果容器节点自身带有 Sprite、Label 或 Skeletal，作为背景/内容图层插入到该组文件夹最底层
+                    if (sprite || label || isSkeletal) {
+                        const transform = getRelativeTransform(node);
+                        let imgBase64 = null;
+                        if (isSkeletal) {
+                            try { imgBase64 = rasterizeSkeletal(node, transform); } catch(e) {}
+                        } else if (sprite) {
+                            try { imgBase64 = rasterizeSprite(sprite, transform); } catch(e) {}
+                        } else if (label) {
+                            try { imgBase64 = rasterizeLabel(label, transform); } catch(e) {}
+                        }
+                        if (imgBase64) {
+                            results.push({
+                                name: node.name + "_bg",
+                                type: 'image',
+                                left: transform.box.left,
+                                top: transform.box.top,
+                                width: transform.box.width,
+                                height: transform.box.height,
+                                opacity: node.opacity !== undefined ? node.opacity : 255,
+                                visible: node.active !== false,
+                                imageBase64: imgBase64
+                            });
+                        }
+                    }
+
+                    // 遍历子节点
+                    for (let i = 0; i < node.childrenCount; i++) {
+                        traverse(node.children[i], results);
+                    }
+
+                    // 闭合文件夹
+                    results.push({
+                        name: node.name,
+                        type: 'group_end',
+                        left: 0, top: 0, width: 0, height: 0,
+                        opacity: 0, visible: false
+                    });
+                } else {
+                    // 叶子节点直接导出图片/文字/骨骼图层
+                    if (sprite || label || isSkeletal) {
+                        const transform = getRelativeTransform(node);
+                        let imgBase64 = null;
+                        if (isSkeletal) {
+                            try { imgBase64 = rasterizeSkeletal(node, transform); } catch(e) {}
+                        } else if (sprite) {
+                            try { imgBase64 = rasterizeSprite(sprite, transform); } catch(e) {}
+                        } else if (label) {
+                            try { imgBase64 = rasterizeLabel(label, transform); } catch(e) {}
+                        }
+                        if (imgBase64) {
+                            results.push({
+                                name: node.name,
+                                type: 'image',
+                                left: transform.box.left,
+                                top: transform.box.top,
+                                width: transform.box.width,
+                                height: transform.box.height,
+                                opacity: node.opacity !== undefined ? node.opacity : 255,
+                                visible: node.active !== false,
+                                imageBase64: imgBase64
+                            });
+                        }
+                    }
+                }
+            }
+
+            traverse(rootNode, exportList);
+            return JSON.stringify({
+                width: Math.round(rootWidth),
+                height: Math.round(rootHeight),
+                layers: exportList
+            });
         }
     };
 }

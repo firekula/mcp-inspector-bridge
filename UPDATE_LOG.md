@@ -1,15 +1,31 @@
 # 更新日志 (Update Log)
 
 本项目记录 `mcp-inspector-bridge` 的重大里程碑、架构变更与缺陷修复记录。
-## [Unreleased] - 2026-07-17
+## [Unreleased] - 2026-07-20
 
 ### ✨ 新特性
 
+- **选中节点一键导出为 PSD (Export Selected Node Tree as PSD)**：运行时选中节点树后，一键高保真导出当前节点及所有子图层为标准 PSD 布局文件。
+  - **坐标系统自动转换**：自动计算节点在 Cocos 坐标系（左下角原点，Y轴向上，Anchor对齐）下的世界包围盒，映射到 PSD 坐标系（左上角原点，Y轴向下）。
+  - **Sprite/Label 自动栅格化**：游戏端（WebView）自动抓取 Sprite 纹理（包含九宫格、Plist合图旋转裁剪、ScaleX/ScaleY镜像及颜色节点混合染色）和 Label 文本渲染参数，使用 2D Canvas 栅格化为 Base64。
+  - **ag-psd 打包装包**：面板端动态加载 `ag-psd`，异步等待图像资产解析，并在内存中构建还原 PSD 图层组（文件夹）和图层混合，输出 ArrayBuffer。
+  - **主进程保存文件**：注册 `psd-save-file` IPC，通过 Electron `dialog.showSaveDialog` 供用户选取磁盘路径进行写入。
 - **MCP 脚本系统 cc 变量安全拦截 (MCP Script cc Interception)**：针对面板侧（编辑器进程）运行脚本时误用 Cocos Creator 运行时 API 的问题，引入双重拦截防御机制：
   - **局部形参遮蔽**：在加载脚本时，将 `new Function` 改为接收 `'cc'` 形参并绑定至 `ccProxy` 代理对象，对外层任何直接使用 `cc` 的行为进行安全拦截。
   - **全局属性监听**：在面板侧全局 `window` 上配置只读的 `cc` 拦截属性，防御在脚本外层直接调用 `window.cc.xxx`。
   - **友好中文报错**：拦截后会抛出详细的指导性错误（如提示“无法在面板侧直接使用 cc，请在 mcp.runInGame 闭包中调用”），且面板侧展示完整错误堆栈。
 - **调试定位优化 (Source Map Mapping)**：在执行的用户脚本尾部自动注入 `//# sourceURL=mcp-script:///${fileName}`，使控制台错误堆栈能够直接定位至具体的脚本文件名和错误行号，并支持 Chrome DevTools 打断点调试。
+
+### 🐛 缺陷修复 & 优化
+
+- **PSD 导出多项视觉还原与格式修复**：
+  - **动态图集与已回收 DOM Image 过滤**：解决部分 UI 切图（按钮背景、图标）被引擎回收像素数据导致导出的图层变成全透明的问题。增加 `naturalWidth !== 0` 强校验，一旦发现 DOM 图片失效，自动退回并绑定 GPU FBO WebGL `readPixels` 读取真实物理像素，完全解决了图片图层丢失的问题。
+  - **九宫格 (Nine-Slice) 无畸变拉伸**：针对启用 SLICED 的大背景板拉伸形变问题，实现并集成了 Canvas 版 `drawNineSlice` 九宫格渲染器，提取 `spriteFrame.inset` 四向拉伸保护边距，保护圆角和边框比例。
+  - **多行 Label 自动折行排版**：针对 Canvas 原生 `fillText` 不支持多行导致长文本换行被裁切为单行的问题，通过 `ctx.measureText` 动态计算字符宽度将长文本切分成多行，并通过 `lineHeight` 进行逐行 Y 轴偏移渲染。
+  - **对齐与边界锚点修正**：根据 Label 的 `horizontalAlign` 和 `verticalAlign` 属性，精确反算文字相对于 Canvas Bounding Box 边界的 `textX` 和 `textY` 坐标（如左对齐对应 `-ax * width`），杜绝任何文字裁剪。
+  - **自定义 TTF 字体样式映射**：自动检测 `cc.Label` 身上的非系统字体关联，提取 `@font-face` 注册的 CSS `fontFamily` 名称供 Canvas 绘制，确保艺术字体在 PSD 里的样式与游戏完全一致。
+  - **关闭按钮边缘裁剪与拉伸形变修复**：修正了 `rotated` 旋转贴图在大图集（Atlas）裁剪时的宽高参数错误，并重构了 `getRelativeTransform`。对于 TRIMMED 和 RAW 模式 of Sprite 节点，直接使用图片原始尺寸计算 Canvas 尺寸和相对缩放，彻底解决了关闭按钮边缘缺口被裁剪和拉伸变形的 Bug。
+  - **WebGL 回读方向校正**：移除了普通 Texture2D（含动态图集）在 GPU 离屏像素读取后不必要的垂直翻转，保留 RenderTexture（Spine 骨骼相机截图）的翻转，解决了背景图颠倒的问题。
 
 ### 🧹 测试与整理
 
