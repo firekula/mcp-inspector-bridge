@@ -9,6 +9,16 @@
   - **统一跨视图定位方法 `locateAndExpandNode`**：在 `useNodeSystem` 中新增并导出统一定位方法（自动切 Tab + `nextTick` DOM 渲染感知 + `expandToNode` 展开高亮），渲染调试器的跨视图定位逻辑重构为复用同一方法。
   - **兜底同步机制**：节点树缓存未命中时自动触发属性兜底同步并请求场景端重同步节点树（`__mcpSyncNodeTree`）；点击空白区域仅退出拾取状态，不误切 Tab。
 
+### 🐛 缺陷修复
+
+- **修复节点拾取器滚动定位从未生效 (Fix Node Picker Locate Scroll)**
+  **问题**：面板运行于 Shadow DOM，`expandToNode` 经 `document.querySelector` 查找目标行永远落空，滚动居中从未执行。
+  **方案**：改用组件内容器查询 + `nextTick` 精确等待渲染；搜索过滤隐藏目标行时自动清空搜索。
+
+- **修复动态节点拾取定位静默失败 (Fix Node Picker Locate Retry)**
+  **问题**：节点树缓存未命中时仅属性兜底并请求重同步，同步数据到达后从不重试展开，动态节点定位必然失败。
+  **方案**：未命中挂起定位请求，监听 `lastTreeUpdate` 于重同步后自动重试（上限 3 次），失败输出可见警告。
+
 ---
 
 ## [Unreleased] - 2026-07-31
