@@ -1,4 +1,4 @@
-const { nextTick, onUnmounted } = require('vue');
+const { nextTick, onUnmounted, watch } = require('vue');
 declare const Editor: any;
 
 export function useNodeSystem(globalState: any, gameView: any, nodeTreeRef: any, activeTab: any) {
@@ -224,8 +224,14 @@ export function useNodeSystem(globalState: any, gameView: any, nodeTreeRef: any,
             `).catch((err: any) => console.error("[RenderDebugger] executeJavaScript 抛出异常:", err));
     };
 
+    // ===== 补定位状态：树缓存未命中时挂起，等待重同步数据到达后自动重试 =====
+    let pendingLocateUuid: string | null = null; // 挂起待补定位的节点 UUID
+    let locateRetryCount = 0;                    // 当前挂起定位已重试次数
+    const MAX_LOCATE_RETRY = 3;                  // 重试上限，防止无限循环
+
     /**
      * 定位并展开指定 UUID 的节点（包含自动切换至节点树 Tab 逻辑）
+     * 树缓存未命中时挂起 pendingLocateUuid，待重同步数据到达后由 watch 自动重试补定位
      * @param uuid 目标节点 UUID
      */
     const locateAndExpandNode = (uuid: string) => {
@@ -233,24 +239,54 @@ export function useNodeSystem(globalState: any, gameView: any, nodeTreeRef: any,
         activeTab.value = 0; // 自动切换至节点树 Tab
         nextTick(() => {
             const nt: any = nodeTreeRef.value;
-            if (nt && typeof nt.expandToNode === 'function') {
-                const success = nt.expandToNode(uuid);
-                if (!success) {
-                    console.warn(`[Bridge] 节点树缓存中未找到节点(UUID: ${uuid})，启用属性兜底同步`);
-                    onNodeSelect({ id: uuid }, true);
-                    try {
-                        const syncCode = "if(window.__mcpSyncNodeTree) { window.__mcpSyncNodeTree(); }";
-                        const wv: any = gameView.value;
-                        if (wv && typeof wv.executeJavaScript === 'function') {
-                            wv.executeJavaScript(syncCode).catch(() => {});
-                        }
-                    } catch(err) {}
-                }
-            } else {
-                onNodeSelect({ id: uuid }, true);
+            const success = nt && typeof nt.expandToNode === 'function' && nt.expandToNode(uuid);
+            if (success) {
+                // 定位成功：清空挂起状态（最新定位覆盖旧挂起）
+                pendingLocateUuid = null;
+                locateRetryCount = 0;
+                return;
             }
+            console.warn(`[Bridge] 节点树缓存中未找到节点(UUID: ${uuid})，启用属性兜底同步`);
+            // 记录挂起定位（含树组件未挂载场景），后到拾取覆盖旧挂起
+            pendingLocateUuid = uuid;
+            locateRetryCount = 0;
+            onNodeSelect({ id: uuid }, true);
+            try {
+                const syncCode = "if(window.__mcpSyncNodeTree) { window.__mcpSyncNodeTree(); }";
+                const wv: any = gameView.value;
+                if (wv && typeof wv.executeJavaScript === 'function') {
+                    wv.executeJavaScript(syncCode).catch(() => {});
+                }
+            } catch(err) {}
         });
     };
+
+    /**
+     * 监听节点树重同步完成（update-tree 回流刷新 globalState.lastTreeUpdate），
+     * 若存在挂起的补定位请求则自动重试展开；最多重试 MAX_LOCATE_RETRY 次后可见告警放弃
+     */
+    watch(() => globalState.lastTreeUpdate, () => {
+        if (!pendingLocateUuid) return;
+        try {
+            const nt: any = nodeTreeRef.value;
+            const success = nt && typeof nt.expandToNode === 'function' && nt.expandToNode(pendingLocateUuid);
+            if (success) {
+                pendingLocateUuid = null;
+                locateRetryCount = 0;
+                return;
+            }
+        } catch (err) {
+            console.warn('[Bridge] 补定位重试发生异常:', err);
+        }
+        locateRetryCount++;
+        if (locateRetryCount >= MAX_LOCATE_RETRY) {
+            const msg = `[Bridge] 节点树重同步后仍未找到节点(UUID: ${pendingLocateUuid})，已放弃补定位`;
+            if (typeof Editor !== 'undefined' && Editor.warn) Editor.warn(msg);
+            else console.warn(msg);
+            pendingLocateUuid = null;
+            locateRetryCount = 0;
+        }
+    });
 
     const onRenderDebuggerLocate = (id: string) => {
         locateAndExpandNode(id);
