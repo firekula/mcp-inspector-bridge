@@ -8,7 +8,7 @@ interface CustomResolution {
     height: number;
 }
 
-export function useLayout(globalState: any, wrapMount: any, wrapperSize: any) {
+export function useLayout(globalState: any, wrapMount: any, wrapperSize: any, inspectorWrapRef?: any) {
     const selectedResolution = ref('FIT');
     const isLandscape = ref(false);
     
@@ -111,8 +111,9 @@ export function useLayout(globalState: any, wrapMount: any, wrapperSize: any) {
             if (isVertical) {
                 const deltaY = (e.clientY - startY) / (globalState.uiScale || 1.0);
                 const newHeight = startHeight + deltaY;
-                const wrapCtx = document.querySelector('.right-panel-wrap-ctx') || document.body;
-                const maxH = wrapCtx.clientHeight - 150;
+                // 高度上限取自 Tab 0 布局容器（面板运行于 Shadow DOM，且旧查询类名在模板中已不存在，禁止 document 查询）
+                const wrapCtx: any = inspectorWrapRef && inspectorWrapRef.value ? inspectorWrapRef.value : null;
+                const maxH = wrapCtx ? (wrapCtx.clientHeight - 150) : 9999;
                 
                 if (newHeight > 100 && newHeight < (maxH > 100 ? maxH : 9999)) {
                     nodeTreePanelHeight.value = newHeight;

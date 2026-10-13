@@ -64,9 +64,10 @@ module.exports = Editor.Panel.extend({
                     const devtoolsView = ref(null);
                     const wrapMount = ref(null);
                     const nodeTreeRef = ref(null);
+                    const inspectorWrapRef = ref(null);
 
                 // Initialize Composables
-                const layoutSystem = useLayout(globalState, wrapMount, wrapperSize);
+                const layoutSystem = useLayout(globalState, wrapMount, wrapperSize, inspectorWrapRef);
                 const tabSystem = useTabs();
                 const profilerSystem = useProfiler(globalState, gameView, activeTab);
 
@@ -844,6 +845,7 @@ mcp.log('脚本已加载');
                     gameView,
                     devtoolsView,
                     wrapMount,
+                    inspectorWrapRef,
                     nodeTreeRef,
                     statsFpsColor,
                     statsAvgFpsColor,

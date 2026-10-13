@@ -864,7 +864,7 @@
                     style="padding: 10px; background: #fff3e0; color: #ef6c00; font-size: 11px; border-bottom: 1px solid #ffe0b2;">
                     ⚠️ [降级容错模式] 原生 IPC 数据链路受阻，当前面板正通过主动 DOM 轮询模式拉取。
                 </div>
-                <div
+                <div ref="inspectorWrapRef"
                     :style="{ flex: 1, display: 'flex', flexDirection: globalState.inspectorLayout === 'vertical' ? 'column' : 'row', minHeight: 0 }">
                     <div
                         :style="{ [globalState.inspectorLayout === 'vertical' ? 'height' : 'width']: (globalState.inspectorLayout === 'vertical' ? nodeTreePanelHeight : nodeTreePanelWidth) + 'px', flexShrink: 0, display: 'flex', flexDirection: 'column', overflowY: 'hidden', background: '#252525' }">
