@@ -239,7 +239,13 @@ export function useNodeSystem(globalState: any, gameView: any, nodeTreeRef: any,
         activeTab.value = 0; // 自动切换至节点树 Tab
         nextTick(() => {
             const nt: any = nodeTreeRef.value;
-            const success = nt && typeof nt.expandToNode === 'function' && nt.expandToNode(uuid);
+            // 首次调用的同步异常按未命中处理，避免抛出中断后续挂起/兜底流程导致定位静默失败
+            let success = false;
+            try {
+                success = !!(nt && typeof nt.expandToNode === 'function' && nt.expandToNode(uuid));
+            } catch (err) {
+                console.warn('[Bridge] expandToNode 首次调用异常，转入补定位重试:', err);
+            }
             if (success) {
                 // 定位成功：清空挂起状态（最新定位覆盖旧挂起）
                 pendingLocateUuid = null;
@@ -264,9 +270,14 @@ export function useNodeSystem(globalState: any, gameView: any, nodeTreeRef: any,
     /**
      * 监听节点树重同步完成（update-tree 回流刷新 globalState.lastTreeUpdate），
      * 若存在挂起的补定位请求则自动重试展开；最多重试 MAX_LOCATE_RETRY 次后可见告警放弃
+     * 注意 1：使用 flush: 'post' 确保重试在组件以新树完成渲染后执行，避免读到旧树
+     * 注意 2：lastTreeUpdate 归零（预览刷新/初始化）只是树失效信号而非新数据到达，
+     *         此时直接忽略且不消耗重试计数，保持挂起定位待刷新后的真实更新继续补定位
      */
     watch(() => globalState.lastTreeUpdate, () => {
         if (!pendingLocateUuid) return;
+        // 树失效信号（预览刷新/初始化归零）：不消耗重试预算，保持挂起定位
+        if (globalState.lastTreeUpdate === 0) return;
         try {
             const nt: any = nodeTreeRef.value;
             const success = nt && typeof nt.expandToNode === 'function' && nt.expandToNode(pendingLocateUuid);
@@ -286,7 +297,7 @@ export function useNodeSystem(globalState: any, gameView: any, nodeTreeRef: any,
             pendingLocateUuid = null;
             locateRetryCount = 0;
         }
-    });
+    }, { flush: 'post' });
 
     const onRenderDebuggerLocate = (id: string) => {
         locateAndExpandNode(id);
