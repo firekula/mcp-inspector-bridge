@@ -107,5 +107,5 @@
 
 ## 7. 范围边界 (Scope)
 
-- 仅修复定位链路的三个文件（`NodeTree.ts`、`useNodeSystem.ts`、`useLayout.ts`），不重构树组件渲染方式、不改动探针同步频率与 IPC 协议。
+- 仅修复定位链路的三个文件（`NodeTree.ts`、`useNodeSystem.ts`、`useLayout.ts`，及为 `useLayout` 传参所需的模板 ref 挂线：`index.html` / `index.ts`），不重构树组件渲染方式、不改动探针同步频率与 IPC 协议。
 - 不处理"拾取命中检测（`hitTest`）本身失败"的假设场景；若实测连 Tab 都不切换，另行排查拾取命中链路。
