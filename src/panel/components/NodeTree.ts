@@ -1,4 +1,4 @@
-const { ref, computed } = require('vue');
+const { ref, computed, nextTick } = require('vue');
 
 // @ts-ignore
 export const NodeTree = {
@@ -18,7 +18,7 @@ export const NodeTree = {
                     &times;
                 </span>
             </div>
-            <div class="tree-content" style="padding-bottom: 0;">
+            <div class="tree-content" ref="treeContentRef" style="padding-bottom: 0;">
                 <div style="min-width: 100%; width: max-content; padding-bottom: 5px;">
                     <div v-if="visibleNodes.length === 0" class="empty-hint">
                         没有找到匹配的节点
@@ -59,6 +59,8 @@ export const NodeTree = {
     setup(props: any, { emit }: any) {
         const searchQuery = ref('');
         const selectedId = ref('');
+        // 滚动定位容器：面板运行于 Shadow DOM，必须从组件内部容器查询目标行
+        const treeContentRef = ref(null);
         // 保存节点的展开状态 id -> boolean
         const expandedState = ref({} as Record<string, boolean>);
 
@@ -267,11 +269,18 @@ export const NodeTree = {
                 // 2. 模拟高亮选中对象
                 selectedId.value = targetId;
 
-                // 3. 将元素滑向视野中央
-                setTimeout(() => {
-                    const el = document.querySelector('.tree-node.active');
+                // 3. 若搜索过滤把目标行藏住了，先清空搜索关键字让目标行渲染可见
+                if (searchQuery.value) {
+                    searchQuery.value = '';
+                }
+
+                // 4. 等展开/选中/清搜索渲染完成后，从组件内容器查询目标行并滑向视野中央
+                // 注意：面板运行在 Shadow DOM 中，document.querySelector 穿不透 Shadow 边界，必须使用组件内容器查询
+                nextTick(() => {
+                    const container: any = treeContentRef.value;
+                    const el = container ? container.querySelector('.tree-node.active') : null;
                     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 100);
+                });
 
                 console.log(`[Selection-Debug] Trigger: Panel-Tree-ExpandToNode | TargetID: ${targetId}`);
 
@@ -322,6 +331,7 @@ export const NodeTree = {
         return {
             searchQuery,
             selectedId,
+            treeContentRef,
             visibleNodes,
             toggleExpand,
             selectNode,
