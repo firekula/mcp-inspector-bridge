@@ -61,6 +61,7 @@ npm run build
 
 - **包围盒高亮**：鼠标悬停/选中节点时，游戏画面实时渲染精准的贴边多边形轮廓，零宽高节点自动降级为十字准星
 - **屏幕拾取器**：直接在游戏画面中点击选取节点，基于多摄像机阵列扫描 + CullingMask 分组继承 + 面积权重透层算法，完美适配多镜头、多分组、Fit 缩放等复杂场景
+- **拾取即定位**：选中后自动切回节点树并展开祖先、高亮平滑滚动居中；运行时动态创建的节点会在节点树刷新后自动补定位，搜索过滤状态下自动清空搜索确保目标可见
 
 ### 🤖 AI MCP 集成桥 (Multi-Instance Ready)
 
@@ -195,12 +196,15 @@ mcp-inspector-bridge/
 ├── package.json               # 插件清单与脚本定义
 ├── main.js                    # Cocos 插件主进程入口
 ├── dist/                      # 编译产物目录
+├── bin/
+│   └── win32/ffmpeg.exe       # 录屏 MP4 转码用 FFmpeg (Windows)
 ├── src/
 │   ├── main.ts                # 主进程逻辑 (IPC 注册、 BrowserView 管理)
 │   ├── preload.ts             # Webview 预加载脚本 (IPC 桥接 + 探针注入)
 │   ├── scene-script.ts        # 编辑器 Scene 进程脚本 (仅用于少量原生操作)
 │   ├── ipc-router.ts          # 分发 IPC 与 WebContents 异步交互路由
 │   ├── cdp-log-listener.ts    # CDP 日志监听器 (BrowserView 原生事件 / Webview CDP debugger / 注入降级)
+│   ├── proxy-manager.ts       # Webview 独立网络代理管理 (Electron Session 隔离)
 │   ├── panel/
 │   │   ├── index.ts           # 面板入口，Vue 3 应用挂载
 │   │   ├── index.html         # 面板 HTML 模板与样式
@@ -211,11 +215,13 @@ mcp-inspector-bridge/
 │   │   │   ├── useDevTools.ts # DevTools BrowserView 管理
 │   │   │   ├── useNodeSystem.ts # 节点选择/属性系统
 │   │   │   ├── useProfiler.ts # 性能数据采集
+│   │   │   ├── useScriptSystem.ts # 用户脚本系统
 │   │   │   └── useTabs.ts     # 标签页排序
 │   │   └── components/        # Vue 组件
 │   │       ├── NodeTree.ts    # 节点树组件
 │   │       ├── NodeInspector.ts # 属性检查器
 │   │       ├── RenderDebugger.ts # 渲染调试器
+│   │       ├── ScriptManager.ts # 用户脚本管理器
 │   │       └── WidgetVisualizer.ts # Widget 可视化
 │   ├── mcp-client/            # MCP 原生客户端与服务层
 │   │   ├── index.ts           # MCP Stdio 服务器入口，处理多实例扫描与路由切换
@@ -226,14 +232,28 @@ mcp-inspector-bridge/
 │   └── probe/                 # 探针模块 (esbuild → dist/probe.js)
 │       ├── index.ts           # 探针主入口与生命周期
 │       ├── crawler.ts         # 节点树爬虫
+│       ├── crawler-serialize.ts # 节点树序列化
+│       ├── engine-helper.ts   # 引擎实例查找器
 │       ├── highlighter.ts     # 高亮渲染层
 │       ├── picker.ts          # 屏幕拾取器
 │       ├── profiler.ts        # 帧率/耗时采集
 │       ├── memory.ts          # 内存资源扫描
 │       ├── render-debugger.ts # 渲染管线劫持
+│       ├── console-hijacker.ts # 控制台劫持 (已废弃，日志由 CDP 接管)
 │       └── logger.ts          # 调试日志门控
-├── memory/                    # 项目章程文档
-└── specs/                     # 功能规范文档
+├── docs/                      # 项目文档
+│   ├── ARCHITECTURE.md        # 架构决策与协议约定
+│   ├── user-script-guide.md   # 用户脚本开发指南
+│   └── superpowers/           # 功能设计规范与实施计划
+├── memory/
+│   └── constitution.md        # 项目章程文档
+├── panel/
+│   └── index.js               # 脚手架遗留面板占位 (未接入)
+├── scratch/                   # 临时试验脚本
+├── preview.html               # 预览调试页
+├── DESIGN.md                  # MCP 脚本系统设计文档
+├── PLAN.md                    # 任务排期与规约计划
+└── UPDATE_LOG.md              # 更新日志
 ```
 
 ---
