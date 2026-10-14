@@ -860,43 +860,40 @@
                 <!-- 渲染组 -->
                 <div>
                     <span style="color:#888;">绘制调用</span>
-                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.drawCall }}</span>
+                    <span :style="{color: statsDrawCallColor, marginLeft: '6px'}">{{ globalState.profiler.tick.drawCall }}</span>
                 </div>
                 <div>
                     <span style="color:#888;">逻辑耗时</span>
-                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.logicTime }} ms</span>
+                    <span :style="{color: statsLogicTimeColor, marginLeft: '6px'}">{{ globalState.profiler.tick.logicTime }} ms</span>
                 </div>
                 <div>
                     <span style="color:#888;">渲染耗时</span>
-                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.renderTime }} ms</span>
-                </div>
-                <div>
-                    <span style="color:#888;">GPU耗时</span>
-                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.gpuTime }} ms</span>
+                    <span :style="{color: statsRenderTimeColor, marginLeft: '6px'}">{{ globalState.profiler.tick.renderTime }} ms</span>
                 </div>
                 <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 2px 0;"></div>
                 <!-- 管线组 -->
                 <div>
                     <span style="color:#888;">着色器切换</span>
-                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.shaderSwitches }}</span>
+                    <span :style="{color: statsShaderSwColor, marginLeft: '6px'}">{{ globalState.profiler.tick.shaderSwitches }}</span>
                 </div>
                 <div>
                     <span style="color:#888;">纹理绑定</span>
-                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.textureBinds }}</span>
+                    <span :style="{color: statsTexBindsColor, marginLeft: '6px'}">{{ globalState.profiler.tick.textureBinds }}</span>
                 </div>
                 <div>
                     <span style="color:#888;">顶点数</span>
-                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.vertices.toLocaleString() }}</span>
+                    <span :style="{color: statsVertsColor, marginLeft: '6px'}">{{ globalState.profiler.tick.vertices.toLocaleString() }}</span>
                 </div>
                 <div>
                     <span style="color:#888;">三角面</span>
-                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.triangles.toLocaleString() }}</span>
+                    <span :style="{color: statsTrisColor, marginLeft: '6px'}">{{ globalState.profiler.tick.triangles.toLocaleString() }}</span>
                 </div>
                 <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 2px 0;"></div>
                 <!-- 物理组 -->
                 <div>
                     <span style="color:#888;">物理耗时</span>
-                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.physicsTime }} ms</span>
+                    <span v-if="isPhysicsEnabled" :style="{color: statsPhysicsTimeColor, marginLeft: '6px'}">{{ globalState.profiler.tick.physicsTime }} ms</span>
+                    <span v-else style="color:#555; margin-left: 6px; font-style: italic;">未启用</span>
                 </div>
                 <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 2px 0;"></div>
                 <!-- 内存组 -->
@@ -906,7 +903,7 @@
                 </div>
                 <div>
                     <span style="color:#888;">JS堆内存</span>
-                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.jsHeapUsed }} / {{ globalState.profiler.tick.jsHeapTotal }} MB</span>
+                    <span :style="{color: statsJsHeapColor, marginLeft: '6px'}">{{ globalState.profiler.tick.jsHeapUsed }} / {{ globalState.profiler.tick.jsHeapTotal }} MB</span>
                 </div>
                 <div>
                     <span style="color:#888;">节点数</span>

@@ -98,6 +98,87 @@ module.exports = Editor.Panel.extend({
                     return '#f44336';
                 });
 
+                // 绘制调用颜色：< 50 绿色，< 150 橙色，>= 150 红色
+                const statsDrawCallColor = computed(() => {
+                    const dc = globalState.profiler.tick.drawCall;
+                    if (dc < 50) return '#4caf50';
+                    if (dc < 150) return '#ff9800';
+                    return '#f44336';
+                });
+
+                // 逻辑耗时颜色：< 5ms 绿色，< 15ms 橙色，>= 15ms 红色
+                const statsLogicTimeColor = computed(() => {
+                    const t = globalState.profiler.tick.logicTime;
+                    if (t < 5) return '#4caf50';
+                    if (t < 15) return '#ff9800';
+                    return '#f44336';
+                });
+
+                // 渲染耗时颜色：< 5ms 绿色，< 15ms 橙色，>= 15ms 红色
+                const statsRenderTimeColor = computed(() => {
+                    const t = globalState.profiler.tick.renderTime;
+                    if (t < 5) return '#4caf50';
+                    if (t < 15) return '#ff9800';
+                    return '#f44336';
+                });
+
+                // 物理耗时颜色：< 2ms 绿色，< 8ms 橙色，>= 8ms 红色
+                const statsPhysicsTimeColor = computed(() => {
+                    const t = globalState.profiler.tick.physicsTime;
+                    if (t === 0) return '#666'; // 未启用
+                    if (t < 2) return '#4caf50';
+                    if (t < 8) return '#ff9800';
+                    return '#f44336';
+                });
+
+                // 是否启用了物理系统
+                const isPhysicsEnabled = computed(() => {
+                    return globalState.profiler.tick.physicsTime > 0;
+                });
+
+                // 着色器切换颜色：< 30 绿色，< 80 橙色，>= 80 红色
+                const statsShaderSwColor = computed(() => {
+                    const s = globalState.profiler.tick.shaderSwitches;
+                    if (s < 30) return '#4caf50';
+                    if (s < 80) return '#ff9800';
+                    return '#f44336';
+                });
+
+                // 纹理绑定颜色：< 50 绿色，< 120 橙色，>= 120 红色
+                const statsTexBindsColor = computed(() => {
+                    const t = globalState.profiler.tick.textureBinds;
+                    if (t < 50) return '#4caf50';
+                    if (t < 120) return '#ff9800';
+                    return '#f44336';
+                });
+
+                // 顶点数颜色：< 50000 绿色，< 150000 橙色，>= 150000 红色
+                const statsVertsColor = computed(() => {
+                    const v = globalState.profiler.tick.vertices;
+                    if (v < 50000) return '#4caf50';
+                    if (v < 150000) return '#ff9800';
+                    return '#f44336';
+                });
+
+                // 三角面颜色：< 30000 绿色，< 100000 橙色，>= 100000 红色
+                const statsTrisColor = computed(() => {
+                    const t = globalState.profiler.tick.triangles;
+                    if (t < 30000) return '#4caf50';
+                    if (t < 100000) return '#ff9800';
+                    return '#f44336';
+                });
+
+                // JS Heap 使用率颜色
+                const statsJsHeapColor = computed(() => {
+                    const used = globalState.profiler.tick.jsHeapUsed;
+                    const total = globalState.profiler.tick.jsHeapTotal;
+                    if (total === 0) return '#e0e0e0';
+                    const ratio = used / total;
+                    if (ratio < 0.5) return '#4caf50';
+                    if (ratio < 0.75) return '#ff9800';
+                    return '#f44336';
+                });
+
                 const nodeSystem = useNodeSystem(globalState, gameView, nodeTreeRef, activeTab);
 
                 const gameViewSystem = useGameView(
@@ -853,6 +934,16 @@ mcp.log('脚本已加载');
                     statsAvgFpsColor,
                     stats1pLowColor,
                     stats01pLowColor,
+                    statsDrawCallColor,
+                    statsLogicTimeColor,
+                    statsRenderTimeColor,
+                    statsPhysicsTimeColor,
+                    isPhysicsEnabled,
+                    statsShaderSwColor,
+                    statsTexBindsColor,
+                    statsVertsColor,
+                    statsTrisColor,
+                    statsJsHeapColor,
                     isAtlasModalOpen,
                     atlasImages,
                     selectedAtlasIndex,
