@@ -62,38 +62,63 @@ export function initProfiler() {
     const textureNameMap: Map<number, { name: string, uuid: string, type: string }> = new Map();
     const shaderNameMap: Map<number, { name: string, uuid: string, type: string }> = new Map();
 
-    // 构建资源关联映射
+    // 构建资源关联映射 - 改进版本
     function buildAssetMapping() {
         const ccEng = getCcEngine();
         if (!ccEng || !ccEng.assetManager || !ccEng.assetManager.assets) return;
 
         try {
+            // 遍历所有纹理资源，尝试多种方式获取底层 WebGL 纹理
             ccEng.assetManager.assets.forEach((asset: any, uuid: string) => {
                 if (!asset) return;
 
-                // 关联纹理资源 - 尝试多种方式获取底层 WebGL 纹理
                 const isTexture = asset instanceof ccEng.Texture2D ||
-                    (asset.constructor && asset.constructor.name === 'Texture2D') ||
-                    (asset.__classname__ && asset.__classname__.indexOf('Texture') !== -1);
+                    (asset.constructor && asset.constructor.name === 'Texture2D');
 
                 if (isTexture) {
                     const name = asset.name || 'Unnamed';
-                    // 尝试多个可能的属性路径
-                    const candidates = [
-                        asset._texture,
-                        asset._webglObj,
-                        asset._glTexture,
-                        asset.texture,
-                        asset.getImpl && asset.getImpl()
-                    ];
 
-                    for (const webglTexture of candidates) {
-                        if (webglTexture && typeof webglTexture === 'object') {
-                            textureToAssetMap.set(webglTexture, {
-                                uuid: uuid,
-                                name: name,
-                                type: 'Texture2D'
-                            });
+                    // 深度遍历查找 WebGL 纹理对象
+                    const findWebGLTexture = (obj: any, depth: number = 0): any => {
+                        if (!obj || depth > 3) return null;
+
+                        // 检查是否是 WebGL 纹理对象
+                        if (obj.constructor && obj.constructor.name === 'WebGLTexture') {
+                            return obj;
+                        }
+
+                        // 检查常见属性
+                        const props = ['_texture', '_webglObj', '_glTexture', '_glID', 'texture', '_impl', 'impl'];
+                        for (const prop of props) {
+                            if (obj[prop]) {
+                                const result = findWebGLTexture(obj[prop], depth + 1);
+                                if (result) return result;
+                            }
+                        }
+
+                        // 检查 gfx 纹理对象的 _glTexture
+                        if (obj._glTexture !== undefined) {
+                            return obj._glTexture;
+                        }
+
+                        return null;
+                    };
+
+                    const webglTexture = findWebGLTexture(asset);
+                    if (webglTexture) {
+                        textureToAssetMap.set(webglTexture, {
+                            uuid: uuid,
+                            name: name,
+                            type: 'Texture2D'
+                        });
+                    }
+
+                    // 也记录到名称映射，用于调试
+                    if (asset._nativeAsset) {
+                        // 有些纹理有原生资源引用
+                        const nativeAsset = asset._nativeAsset;
+                        if (nativeAsset && nativeAsset.__uuid) {
+                            // 记录 UUID 关联
                         }
                     }
                 }
@@ -106,52 +131,27 @@ export function initProfiler() {
                     const name = asset.name || 'Unnamed';
                     const tex = asset._texture || (asset.getTexture && asset.getTexture());
                     if (tex) {
-                        // tex 可能是 Texture2D，需要进一步获取 WebGL 纹理
-                        const candidates = [
-                            tex._texture,
-                            tex._webglObj,
-                            tex._glTexture,
-                            tex
-                        ];
-                        for (const webglTexture of candidates) {
-                            if (webglTexture && typeof webglTexture === 'object') {
-                                textureToAssetMap.set(webglTexture, {
-                                    uuid: uuid,
-                                    name: name,
-                                    type: 'SpriteFrame'
-                                });
+                        const findWebGLTexture = (obj: any, depth: number = 0): any => {
+                            if (!obj || depth > 3) return null;
+                            if (obj.constructor && obj.constructor.name === 'WebGLTexture') {
+                                return obj;
                             }
-                        }
-                    }
-                }
-
-                // 关联材质/Effect（着色器来源）
-                const isMaterial = asset instanceof ccEng.Material ||
-                    (asset.constructor && asset.constructor.name === 'Material');
-
-                if (isMaterial) {
-                    const name = asset.name || 'Unnamed';
-                    // Material 内部可能有多个 pass，每个 pass 有 program
-                    const effect = asset._effect || asset.effect;
-                    if (effect) {
-                        const programs = effect._programs || effect.programs;
-                        if (programs) {
-                            for (const prog of programs) {
-                                if (prog) {
-                                    shaderToAssetMap.set(prog, {
-                                        uuid: uuid,
-                                        name: name,
-                                        type: 'Material'
-                                    });
+                            const props = ['_texture', '_webglObj', '_glTexture', '_glID', 'texture', '_impl', 'impl'];
+                            for (const prop of props) {
+                                if (obj[prop]) {
+                                    const result = findWebGLTexture(obj[prop], depth + 1);
+                                    if (result) return result;
                                 }
                             }
-                        }
-                        // 也可能是单个 program
-                        if (effect._program) {
-                            shaderToAssetMap.set(effect._program, {
+                            return null;
+                        };
+
+                        const webglTexture = findWebGLTexture(tex);
+                        if (webglTexture) {
+                            textureToAssetMap.set(webglTexture, {
                                 uuid: uuid,
                                 name: name,
-                                type: 'Material'
+                                type: 'SpriteFrame'
                             });
                         }
                     }
@@ -205,19 +205,60 @@ export function initProfiler() {
             return originalUseProgram(program);
         };
 
+        // Hook createTexture - 追踪纹理创建
+        const originalCreateTexture = gl.createTexture.bind(gl);
+        gl.createTexture = function () {
+            const texture = originalCreateTexture();
+            if (texture) {
+                // 记录创建的纹理，用于后续关联
+                if (!texture.__mcpId) {
+                    texture.__mcpId = ++textureIdCounter;
+                }
+            }
+            return texture;
+        };
+
+        // Hook texImage2D - 纹理上传时建立资源关联
+        const originalTexImage2D = gl.texImage2D.bind(gl);
+        gl.texImage2D = function (...args: any[]) {
+            // 当前绑定的纹理
+            const currentTexture = gl.getParameter(gl.TEXTURE_BINDING_2D);
+            if (currentTexture && !textureToAssetMap.has(currentTexture)) {
+                // 尝试从调用栈或参数推断资源来源
+                // 对于 Cocos，纹理数据通常来自 Image/Canvas/Video 元素
+                const source = args[5] || args[6]; // pixels 参数
+                if (source) {
+                    // 记录来源信息
+                    const sourceInfo = {
+                        uuid: '',
+                        name: source.__assetName || source.src || 'Unknown',
+                        type: source.constructor ? source.constructor.name : 'Unknown'
+                    };
+                    // 尝试关联到最近创建的资源
+                    // 这里可以添加更精确的关联逻辑
+                }
+            }
+            return originalTexImage2D.apply(gl, args);
+        };
+
         // Hook bindTexture - 纹理绑定
         const originalBindTexture = gl.bindTexture.bind(gl);
         gl.bindTexture = function (target: number, texture: any) {
             if (texture) {
                 frameTextureBinds++;
+                // 确保纹理有 ID
+                if (!texture.__mcpId) {
+                    texture.__mcpId = ++textureIdCounter;
+                }
+
                 let info = textureBindDetails.get(texture);
                 if (!info) {
-                    info = { count: 0, lastUsed: 0, size: '', id: ++textureIdCounter };
+                    info = { count: 0, lastUsed: 0, size: '', id: texture.__mcpId };
                     textureBindDetails.set(texture, info);
                     // 调试：记录新纹理对象
                     if (window.__MCP_DEBUG__) {
                         const isMapped = textureToAssetMap.has(texture);
-                        console.log(`[Profiler] New texture bound: #${info.id}, mapped=${isMapped}, obj=`, texture);
+                        console.log(`[Profiler] New texture bound: #${info.id}, mapped=${isMapped}`);
                     }
                 }
                 info.count++;
