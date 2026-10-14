@@ -16,6 +16,11 @@ const TOOL_IPC_MAP: Record<string, string> = {
     'disable_script': 'mcp-script-disable',
     'list_scripts': 'mcp-script-list',
     'refresh_preview': 'mcp-refresh-preview',
+    // 性能分析工具 (Phase 4)
+    'get_frame_timeline': 'mcp-query-frame-timeline',
+    'get_memory_timeline': 'mcp-query-memory-timeline',
+    'get_memory_leak_report': 'mcp-query-leak-report',
+    'reset_performance_baseline': 'mcp-reset-perf-baseline',
 };
 
 const CACHE: Record<string, { timestamp: number, data: any }> = {};

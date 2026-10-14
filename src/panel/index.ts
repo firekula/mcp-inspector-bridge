@@ -1106,12 +1106,94 @@ mcp.log('脚本已加载');
             if(!wv) { if (event.reply) event.reply(null, { error: 'No WebView' }); return; }
             if (typeof wv.isConnected === 'boolean' && !wv.isConnected) { if (event.reply) event.reply(null, { error: 'WebView detached from DOM' }); return; }
             try { wv.getWebContentsId(); } catch(e) { if (event.reply) event.reply(null, { error: 'WebView not ready' }); return; }
-            
+
             const code = `
                 (function(){
                     try {
                         if(typeof window.__mcpProfilerTick !== 'function') return JSON.stringify({ error: 'Profiler not injected' });
                         return JSON.stringify(window.__mcpProfilerTick());
+                    } catch(e) { return JSON.stringify({ error: 'EXECUTION_FAILED', msg: e.message }); }
+                })();
+            `;
+            wv.executeJavaScript(code)
+              .then((r:any) => { if(event.reply) event.reply(null, typeof r === 'string' ? JSON.parse(r) : r); })
+              .catch((e:any) => { if(event.reply) event.reply(null, { error: e.message }); });
+        },
+
+        // --- 性能分析工具 IPC 处理 (Phase 4) ---
+        'mcp-query-frame-timeline'(this: any, event: any, args: any) {
+            const wv: any = this.shadowRoot ? this.shadowRoot.querySelector('#game-view') : null;
+            if(!wv) { if (event.reply) event.reply(null, { error: 'No WebView' }); return; }
+            if (typeof wv.isConnected === 'boolean' && !wv.isConnected) { if (event.reply) event.reply(null, { error: 'WebView detached from DOM' }); return; }
+            try { wv.getWebContentsId(); } catch(e) { if (event.reply) event.reply(null, { error: 'WebView not ready' }); return; }
+
+            const limit = args?.limit || 600;
+            const code = `
+                (function(){
+                    try {
+                        if(typeof window.__mcpGetFrameTimeline !== 'function') return JSON.stringify({ error: 'FrameTimeline not injected' });
+                        var data = window.__mcpGetFrameTimeline();
+                        if (data.frameTimes && data.frameTimes.length > ${limit}) {
+                            data.frameTimes = data.frameTimes.slice(-${limit});
+                        }
+                        return JSON.stringify(data);
+                    } catch(e) { return JSON.stringify({ error: 'EXECUTION_FAILED', msg: e.message }); }
+                })();
+            `;
+            wv.executeJavaScript(code)
+              .then((r:any) => { if(event.reply) event.reply(null, typeof r === 'string' ? JSON.parse(r) : r); })
+              .catch((e:any) => { if(event.reply) event.reply(null, { error: e.message }); });
+        },
+
+        'mcp-query-memory-timeline'(this: any, event: any, args: any) {
+            const wv: any = this.shadowRoot ? this.shadowRoot.querySelector('#game-view') : null;
+            if(!wv) { if (event.reply) event.reply(null, { error: 'No WebView' }); return; }
+            if (typeof wv.isConnected === 'boolean' && !wv.isConnected) { if (event.reply) event.reply(null, { error: 'WebView detached from DOM' }); return; }
+            try { wv.getWebContentsId(); } catch(e) { if (event.reply) event.reply(null, { error: 'WebView not ready' }); return; }
+
+            const code = `
+                (function(){
+                    try {
+                        if(typeof window.__mcpGetMemoryTimeline !== 'function') return JSON.stringify({ error: 'MemoryTimeline not injected' });
+                        return JSON.stringify(window.__mcpGetMemoryTimeline());
+                    } catch(e) { return JSON.stringify({ error: 'EXECUTION_FAILED', msg: e.message }); }
+                })();
+            `;
+            wv.executeJavaScript(code)
+              .then((r:any) => { if(event.reply) event.reply(null, typeof r === 'string' ? JSON.parse(r) : r); })
+              .catch((e:any) => { if(event.reply) event.reply(null, { error: e.message }); });
+        },
+
+        'mcp-query-leak-report'(this: any, event: any, args: any) {
+            const wv: any = this.shadowRoot ? this.shadowRoot.querySelector('#game-view') : null;
+            if(!wv) { if (event.reply) event.reply(null, { error: 'No WebView' }); return; }
+            if (typeof wv.isConnected === 'boolean' && !wv.isConnected) { if (event.reply) event.reply(null, { error: 'WebView detached from DOM' }); return; }
+            try { wv.getWebContentsId(); } catch(e) { if (event.reply) event.reply(null, { error: 'WebView not ready' }); return; }
+
+            const code = `
+                (function(){
+                    try {
+                        if(typeof window.__mcpDetectMemoryLeak !== 'function') return JSON.stringify({ error: 'LeakDetection not injected' });
+                        return JSON.stringify(window.__mcpDetectMemoryLeak());
+                    } catch(e) { return JSON.stringify({ error: 'EXECUTION_FAILED', msg: e.message }); }
+                })();
+            `;
+            wv.executeJavaScript(code)
+              .then((r:any) => { if(event.reply) event.reply(null, typeof r === 'string' ? JSON.parse(r) : r); })
+              .catch((e:any) => { if(event.reply) event.reply(null, { error: e.message }); });
+        },
+
+        'mcp-reset-perf-baseline'(this: any, event: any, args: any) {
+            const wv: any = this.shadowRoot ? this.shadowRoot.querySelector('#game-view') : null;
+            if(!wv) { if (event.reply) event.reply(null, { error: 'No WebView' }); return; }
+            if (typeof wv.isConnected === 'boolean' && !wv.isConnected) { if (event.reply) event.reply(null, { error: 'WebView detached from DOM' }); return; }
+            try { wv.getWebContentsId(); } catch(e) { if (event.reply) event.reply(null, { error: 'WebView not ready' }); return; }
+
+            const code = `
+                (function(){
+                    try {
+                        if(typeof window.__mcpSetLeakBaseline !== 'function') return JSON.stringify({ error: 'Baseline API not injected' });
+                        return JSON.stringify(window.__mcpSetLeakBaseline());
                     } catch(e) { return JSON.stringify({ error: 'EXECUTION_FAILED', msg: e.message }); }
                 })();
             `;

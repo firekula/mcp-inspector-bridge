@@ -114,6 +114,62 @@ export function setupTools(server: Server, sendRpcToCocos: (method: string, args
                     description: "Get current game runtime performance stats including FPS, DrawCall and CPU logic/render times.",
                     inputSchema: { type: "object", properties: {}, required: [] },
                 },
+                // --- 性能分析工具 (Phase 4) ---
+                {
+                    name: "analyze_performance",
+                    description: "Analyze game performance data: FPS statistics, frame time distribution, memory usage trends, and leak detection. Returns structured data for performance diagnosis.",
+                    inputSchema: {
+                        type: "object",
+                        properties: {
+                            timeRange: {
+                                type: "number",
+                                description: "Time range in seconds to analyze. Default 60, max 300.",
+                                default: 60
+                            },
+                            includeMemory: {
+                                type: "boolean",
+                                description: "Include memory analysis and leak detection. Default true.",
+                                default: true
+                            },
+                            includeFrameTimeline: {
+                                type: "boolean",
+                                description: "Include frame time timeline data. Default true.",
+                                default: true
+                            }
+                        },
+                        required: []
+                    },
+                },
+                {
+                    name: "get_memory_leak_report",
+                    description: "Get detailed memory leak detection report with trend analysis and predictions.",
+                    inputSchema: { type: "object", properties: {}, required: [] },
+                },
+                {
+                    name: "get_frame_timeline",
+                    description: "Get frame time history for timeline visualization and jank analysis.",
+                    inputSchema: {
+                        type: "object",
+                        properties: {
+                            limit: {
+                                type: "number",
+                                description: "Max number of frame samples to return. Default 300.",
+                                default: 300
+                            }
+                        },
+                        required: []
+                    },
+                },
+                {
+                    name: "get_memory_timeline",
+                    description: "Get memory usage history timeline for trend analysis.",
+                    inputSchema: { type: "object", properties: {}, required: [] },
+                },
+                {
+                    name: "reset_performance_baseline",
+                    description: "Reset performance tracking baseline for comparison measurements.",
+                    inputSchema: { type: "object", properties: {}, required: [] },
+                },
                 {
                     name: "install_script",
                     description: "安装或更新用户脚本。传入完整脚本内容（含 // ==McpScript== 元数据块）。脚本将获得声明的 @grant 权限并立即启用。",
@@ -178,6 +234,97 @@ export function setupTools(server: Server, sendRpcToCocos: (method: string, args
                 }
                 throw new Error(`Invalid port: ${port}`);
             }
+
+            // --- 性能分析工具处理 (Phase 4) ---
+            if (name === "analyze_performance") {
+                const timeRange = Math.min(Number(args.timeRange) || 60, 300);
+                const includeMemory = args.includeMemory !== false;
+                const includeFrameTimeline = args.includeFrameTimeline !== false;
+
+                // 收集性能数据
+                const perfData: any = {
+                    timestamp: Date.now(),
+                    timeRangeSeconds: timeRange
+                };
+
+                // 获取运行时统计
+                const runtimeStats = await sendRpcToCocos('get_runtime_stats', {});
+                if (runtimeStats && runtimeStats.content && runtimeStats.content[0]) {
+                    try {
+                        perfData.runtimeStats = JSON.parse(runtimeStats.content[0].text);
+                    } catch (e) {
+                        perfData.runtimeStats = runtimeStats.content[0].text;
+                    }
+                }
+
+                // 获取帧时间线
+                if (includeFrameTimeline) {
+                    const frameData = await sendRpcToCocos('get_frame_timeline', { limit: Math.min(timeRange * 60, 600) });
+                    if (frameData && frameData.content && frameData.content[0]) {
+                        try {
+                            perfData.frameTimeline = JSON.parse(frameData.content[0].text);
+                        } catch (e) {
+                            perfData.frameTimeline = frameData.content[0].text;
+                        }
+                    }
+                }
+
+                // 获取内存分析
+                if (includeMemory) {
+                    const memLeakReport = await sendRpcToCocos('get_memory_leak_report', {});
+                    if (memLeakReport && memLeakReport.content && memLeakReport.content[0]) {
+                        try {
+                            perfData.memoryLeakReport = JSON.parse(memLeakReport.content[0].text);
+                        } catch (e) {
+                            perfData.memoryLeakReport = memLeakReport.content[0].text;
+                        }
+                    }
+
+                    const memoryTimeline = await sendRpcToCocos('get_memory_timeline', {});
+                    if (memoryTimeline && memoryTimeline.content && memoryTimeline.content[0]) {
+                        try {
+                            perfData.memoryTimeline = JSON.parse(memoryTimeline.content[0].text);
+                        } catch (e) {
+                            perfData.memoryTimeline = memoryTimeline.content[0].text;
+                        }
+                    }
+                }
+
+                // 生成分析摘要
+                const summary = generatePerformanceSummary(perfData);
+
+                return {
+                    content: [{
+                        type: "text",
+                        text: JSON.stringify({
+                            summary,
+                            data: perfData
+                        }, null, 2)
+                    }]
+                };
+            }
+
+            if (name === "get_memory_leak_report") {
+                const result = await sendRpcToCocos('get_memory_leak_report', {});
+                return result;
+            }
+
+            if (name === "get_frame_timeline") {
+                const limit = Math.min(Number(args.limit) || 300, 600);
+                const result = await sendRpcToCocos('get_frame_timeline', { limit });
+                return result;
+            }
+
+            if (name === "get_memory_timeline") {
+                const result = await sendRpcToCocos('get_memory_timeline', {});
+                return result;
+            }
+
+            if (name === "reset_performance_baseline") {
+                const result = await sendRpcToCocos('reset_performance_baseline', {});
+                return result;
+            }
+
             // For others, simply proxy to Cocos via general RPC
             const result = await sendRpcToCocos(name, args);
             if (result && result.content) {
@@ -198,4 +345,172 @@ export function setupTools(server: Server, sendRpcToCocos: (method: string, args
             };
         }
     });
+}
+
+/**
+ * 生成性能分析摘要（供 LLM 快速理解）
+ */
+function generatePerformanceSummary(perfData: any): string {
+    const lines: string[] = [];
+
+    lines.push('## 性能分析摘要\n');
+
+    // FPS 分析
+    if (perfData.runtimeStats) {
+        const stats = perfData.runtimeStats;
+        if (stats.fps !== undefined) {
+            lines.push(`### 帧率`);
+            lines.push(`- 当前 FPS: ${stats.fps}`);
+            if (stats.avgFps !== undefined) lines.push(`- 平均 FPS: ${stats.avgFps}`);
+            if (stats.fps1pLow !== undefined) lines.push(`- 1% Low FPS: ${stats.fps1pLow}`);
+            if (stats.fps01pLow !== undefined) lines.push(`- 0.1% Low FPS: ${stats.fps01pLow}`);
+
+            // 帧率健康度评估
+            const avgFps = stats.avgFps || stats.fps;
+            if (avgFps >= 55) {
+                lines.push(`- ✅ 帧率表现优秀 (≥55 FPS)`);
+            } else if (avgFps >= 30) {
+                lines.push(`- ⚠️ 帧率尚可，但有优化空间 (30-55 FPS)`);
+            } else {
+                lines.push(`- 🚨 帧率过低，需要优化 (<30 FPS)`);
+            }
+        }
+
+        // 渲染统计
+        lines.push(`\n### 渲染`);
+        if (stats.drawCall !== undefined) lines.push(`- DrawCall: ${stats.drawCall}`);
+        if (stats.logicTime !== undefined) lines.push(`- 逻辑耗时: ${stats.logicTime} ms`);
+        if (stats.renderTime !== undefined) lines.push(`- 渲染耗时: ${stats.renderTime} ms`);
+        if (stats.gpuTime !== undefined) lines.push(`- GPU 耗时: ${stats.gpuTime} ms`);
+        if (stats.vertices !== undefined) lines.push(`- 顶点数: ${stats.vertices.toLocaleString()}`);
+        if (stats.triangles !== undefined) lines.push(`- 三角形数: ${stats.triangles.toLocaleString()}`);
+        if (stats.shaderSwitches !== undefined) lines.push(`- Shader 切换: ${stats.shaderSwitches}`);
+        if (stats.textureBinds !== undefined) lines.push(`- 纹理绑定: ${stats.textureBinds}`);
+
+        // 瓶颈判断
+        if (stats.logicTime !== undefined && stats.renderTime !== undefined) {
+            const logicRatio = stats.logicTime / (stats.logicTime + stats.renderTime);
+            if (logicRatio > 0.6) {
+                lines.push(`- 📌 瓶颈分析: 逻辑处理占比过高 (${(logicRatio * 100).toFixed(0)}%)，考虑优化游戏逻辑`);
+            } else if (logicRatio < 0.4) {
+                lines.push(`- 📌 瓶颈分析: 渲染占比过高 (${((1 - logicRatio) * 100).toFixed(0)}%)，考虑优化渲染`);
+            } else {
+                lines.push(`- 📌 瓶颈分析: 逻辑/渲染负载均衡`);
+            }
+        }
+
+        // 内存
+        lines.push(`\n### 内存`);
+        if (stats.jsHeapUsed !== undefined) lines.push(`- JS Heap 已用: ${stats.jsHeapUsed} MB`);
+        if (stats.jsHeapTotal !== undefined) lines.push(`- JS Heap 总量: ${stats.jsHeapTotal} MB`);
+        if (stats.totalMemory !== undefined) lines.push(`- 资源内存: ${(stats.totalMemory / 1024 / 1024).toFixed(2)} MB`);
+    }
+
+    // 泄漏检测
+    if (perfData.memoryLeakReport) {
+        const leak = perfData.memoryLeakReport;
+        lines.push(`\n### 泄漏检测`);
+        if (leak.leakDetected !== undefined) {
+            lines.push(`- 状态: ${leak.leakDetected ? '🚨 检测到潜在泄漏' : '✅ 内存趋势正常'}`);
+        }
+        if (leak.trend !== undefined) lines.push(`- 趋势: ${leak.trend}`);
+        if (leak.slopeKBPerSample !== undefined) lines.push(`- 增长率: ${leak.slopeKBPerSample} KB/样本`);
+        if (leak.confidence !== undefined) lines.push(`- 拟合度: ${(leak.confidence * 100).toFixed(1)}%`);
+        if (leak.details) lines.push(`- ${leak.details}`);
+    }
+
+    // 帧时间分析
+    if (perfData.frameTimeline && Array.isArray(perfData.frameTimeline.frameTimes)) {
+        const frameTimes = perfData.frameTimeline.frameTimes;
+        if (frameTimes.length > 0) {
+            const sorted = [...frameTimes].sort((a, b) => a - b);
+            const avg = sorted.reduce((s, v) => s + v, 0) / sorted.length;
+            const p95 = sorted[Math.floor(sorted.length * 0.95)];
+            const p99 = sorted[Math.floor(sorted.length * 0.99)];
+            const jankCount = frameTimes.filter((v: number) => v > 33).length;
+
+            lines.push(`\n### 帧时间分析`);
+            lines.push(`- 样本数: ${frameTimes.length}`);
+            lines.push(`- 平均帧时间: ${avg.toFixed(2)} ms`);
+            lines.push(`- P95 帧时间: ${p95.toFixed(2)} ms`);
+            lines.push(`- P99 帧时间: ${p99.toFixed(2)} ms`);
+            lines.push(`- 卡顿帧 (>33ms): ${jankCount} (${(jankCount / frameTimes.length * 100).toFixed(1)}%)`);
+        }
+    }
+
+    // 优化建议
+    lines.push(`\n### 优化建议`);
+    const suggestions = generateOptimizationSuggestions(perfData);
+    if (suggestions.length > 0) {
+        suggestions.forEach(s => lines.push(`- ${s}`));
+    } else {
+        lines.push(`- 性能表现良好，无需优化`);
+    }
+
+    return lines.join('\n');
+}
+
+/**
+ * 生成优化建议
+ */
+function generateOptimizationSuggestions(perfData: any): string[] {
+    const suggestions: string[] = [];
+
+    if (perfData.runtimeStats) {
+        const stats = perfData.runtimeStats;
+
+        // FPS 低
+        if (stats.fps < 30) {
+            suggestions.push('🚨 **帧率过低**: 优先排查 DrawCall、节点数量、复杂计算');
+        }
+
+        // DrawCall 过高
+        if (stats.drawCall > 100) {
+            suggestions.push(`⚠️ **DrawCall 过高 (${stats.drawCall})**: 考虑图集合并、减少节点、使用合批`);
+        }
+
+        // 逻辑耗时高
+        if (stats.logicTime > 10) {
+            suggestions.push(`⚠️ **逻辑耗时高 (${stats.logicTime}ms)**: 检查 update 循环、物理计算、复杂算法`);
+        }
+
+        // 渲染耗时高
+        if (stats.renderTime > 10) {
+            suggestions.push(`⚠️ **渲染耗时高 (${stats.renderTime}ms)**: 检查特效、粒子、阴影、后处理`);
+        }
+
+        // Shader 切换频繁
+        if (stats.shaderSwitches > 50) {
+            suggestions.push(`💡 **Shader 切换频繁 (${stats.shaderSwitches})**: 尝试材质合并、排序渲染`);
+        }
+
+        // 顶点数过多
+        if (stats.vertices > 100000) {
+            suggestions.push(`💡 **顶点数过多 (${stats.vertices.toLocaleString()})**: 考虑 LOD、网格简化、遮挡剔除`);
+        }
+
+        // JS Heap 使用率高
+        if (stats.jsHeapUsed && stats.jsHeapTotal) {
+            const usage = stats.jsHeapUsed / stats.jsHeapTotal;
+            if (usage > 0.8) {
+                suggestions.push(`🚨 **JS Heap 使用率过高 (${(usage * 100).toFixed(0)}%)**: 检查内存泄漏、及时释放资源`);
+            }
+        }
+    }
+
+    // 泄漏检测
+    if (perfData.memoryLeakReport && perfData.memoryLeakReport.leakDetected) {
+        suggestions.push('🚨 **内存泄漏风险**: 使用 heap snapshot 对比定位泄漏对象');
+    }
+
+    // 帧时间抖动大
+    if (perfData.frameTimeline && Array.isArray(perfData.frameTimeline.frameTimes)) {
+        const frameTimes = perfData.frameTimeline.frameTimes;
+        const jankCount = frameTimes.filter((v: number) => v > 33).length;
+        if (jankCount > frameTimes.length * 0.1) {
+            suggestions.push(`⚠️ **卡顿频繁 (${jankCount} 帧)**: 检查 GC、异步加载、物理碰撞`);
+        }
+    }
+
+    return suggestions;
 }

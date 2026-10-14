@@ -3,7 +3,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { setupTools } from './tools';
 import { setupResources } from './resources';
-// import { setupPrompts } from './prompts';
+import { setupPrompts } from './prompts';
 
 const server = new Server(
     {
@@ -145,6 +145,7 @@ async function sendRpcToCocos(methodName: string, args: any = {}): Promise<any> 
 setupTools(server, sendRpcToCocos);
 setupResources(server, sendRpcToCocos);
 // setupPrompts(server); // Uncomment when adding new prompts in the future
+setupPrompts(server);
 
 async function runServer() {
     const transport = new StdioServerTransport();
