@@ -58,6 +58,9 @@ export function initProfiler() {
     const textureToAssetMap: Map<any, { uuid: string, name: string, type: string }> = new Map();
     // 着色器关联映射：WebGL Program -> Material/Effect 信息
     const shaderToAssetMap: Map<any, { uuid: string, name: string, type: string }> = new Map();
+    // 名称映射：用于显示
+    const textureNameMap: Map<number, { name: string, uuid: string, type: string }> = new Map();
+    const shaderNameMap: Map<number, { name: string, uuid: string, type: string }> = new Map();
 
     // 构建资源关联映射
     function buildAssetMapping() {
@@ -68,62 +71,103 @@ export function initProfiler() {
             ccEng.assetManager.assets.forEach((asset: any, uuid: string) => {
                 if (!asset) return;
 
-                // 关联纹理资源
-                if (asset instanceof ccEng.Texture2D || (asset.constructor && asset.constructor.name === 'Texture2D')) {
-                    // Texture2D 的 _texture 属性是底层 WebGL 纹理
-                    const webglTexture = asset._texture;
-                    if (webglTexture) {
-                        textureToAssetMap.set(webglTexture, {
-                            uuid: uuid,
-                            name: asset.name || 'Unnamed',
-                            type: 'Texture2D'
-                        });
-                    }
-                    // 也可能是 _webglObj 或直接就是 WebGL 纹理
-                    if (asset._webglObj) {
-                        textureToAssetMap.set(asset._webglObj, {
-                            uuid: uuid,
-                            name: asset.name || 'Unnamed',
-                            type: 'Texture2D'
-                        });
+                // 关联纹理资源 - 尝试多种方式获取底层 WebGL 纹理
+                const isTexture = asset instanceof ccEng.Texture2D ||
+                    (asset.constructor && asset.constructor.name === 'Texture2D') ||
+                    (asset.__classname__ && asset.__classname__.indexOf('Texture') !== -1);
+
+                if (isTexture) {
+                    const name = asset.name || 'Unnamed';
+                    // 尝试多个可能的属性路径
+                    const candidates = [
+                        asset._texture,
+                        asset._webglObj,
+                        asset._glTexture,
+                        asset.texture,
+                        asset.getImpl && asset.getImpl()
+                    ];
+
+                    for (const webglTexture of candidates) {
+                        if (webglTexture && typeof webglTexture === 'object') {
+                            textureToAssetMap.set(webglTexture, {
+                                uuid: uuid,
+                                name: name,
+                                type: 'Texture2D'
+                            });
+                        }
                     }
                 }
 
                 // 关联 SpriteFrame 的纹理
-                if (asset instanceof ccEng.SpriteFrame || (asset.constructor && asset.constructor.name === 'SpriteFrame')) {
+                const isSpriteFrame = asset instanceof ccEng.SpriteFrame ||
+                    (asset.constructor && asset.constructor.name === 'SpriteFrame');
+
+                if (isSpriteFrame) {
+                    const name = asset.name || 'Unnamed';
                     const tex = asset._texture || (asset.getTexture && asset.getTexture());
-                    if (tex && tex._texture) {
-                        textureToAssetMap.set(tex._texture, {
-                            uuid: uuid,
-                            name: asset.name || 'Unnamed',
-                            type: 'SpriteFrame'
-                        });
+                    if (tex) {
+                        // tex 可能是 Texture2D，需要进一步获取 WebGL 纹理
+                        const candidates = [
+                            tex._texture,
+                            tex._webglObj,
+                            tex._glTexture,
+                            tex
+                        ];
+                        for (const webglTexture of candidates) {
+                            if (webglTexture && typeof webglTexture === 'object') {
+                                textureToAssetMap.set(webglTexture, {
+                                    uuid: uuid,
+                                    name: name,
+                                    type: 'SpriteFrame'
+                                });
+                            }
+                        }
                     }
                 }
 
                 // 关联材质/Effect（着色器来源）
-                if (asset instanceof ccEng.Material || (asset.constructor && asset.constructor.name === 'Material')) {
-                    // Material 有 _effect 属性
-                    const effect = asset._effect;
-                    if (effect && effect._program) {
-                        shaderToAssetMap.set(effect._program, {
-                            uuid: uuid,
-                            name: asset.name || 'Unnamed',
-                            type: 'Material'
-                        });
-                    }
-                }
+                const isMaterial = asset instanceof ccEng.Material ||
+                    (asset.constructor && asset.constructor.name === 'Material');
 
-                // EffectAsset
-                if (asset instanceof ccEng.EffectAsset || (asset.constructor && asset.constructor.name === 'EffectAsset')) {
-                    if (asset._shaders) {
-                        // EffectAsset 包含多个 shader program
-                        // 这里记录 effect 信息供参考
+                if (isMaterial) {
+                    const name = asset.name || 'Unnamed';
+                    // Material 内部可能有多个 pass，每个 pass 有 program
+                    const effect = asset._effect || asset.effect;
+                    if (effect) {
+                        const programs = effect._programs || effect.programs;
+                        if (programs) {
+                            for (const prog of programs) {
+                                if (prog) {
+                                    shaderToAssetMap.set(prog, {
+                                        uuid: uuid,
+                                        name: name,
+                                        type: 'Material'
+                                    });
+                                }
+                            }
+                        }
+                        // 也可能是单个 program
+                        if (effect._program) {
+                            shaderToAssetMap.set(effect._program, {
+                                uuid: uuid,
+                                name: name,
+                                type: 'Material'
+                            });
+                        }
                     }
                 }
             });
+
+            if (window.__MCP_DEBUG__) {
+                console.log('[Profiler] Asset mapping built:', {
+                    textures: textureToAssetMap.size,
+                    shaders: shaderToAssetMap.size
+                });
+            }
         } catch (e) {
-            // 静默失败
+            if (window.__MCP_DEBUG__) {
+                console.warn('[Profiler] buildAssetMapping error:', e);
+            }
         }
     }
 
@@ -412,14 +456,14 @@ export function initProfiler() {
                     assetUuid = assetInfo.uuid;
                     assetName = assetInfo.name;
                     assetType = assetInfo.type;
-                    name = `${assetInfo.name} (Shader #${info.id})`;
+                    name = `${assetInfo.name}`;
                 } else {
                     // 尝试获取着色器源码片段
                     try {
                         if (cachedGL && program) {
-                            const shaders = cachedGL.getAttachedShaders(program);
-                            if (shaders && shaders.length > 0) {
-                                const source = cachedGL.getShaderSource(shaders[0]);
+                            const attachedShaders = cachedGL.getAttachedShaders(program);
+                            if (attachedShaders && attachedShaders.length > 0) {
+                                const source = cachedGL.getShaderSource(attachedShaders[0]);
                                 if (source) {
                                     const lines = source.split('\n').slice(0, 2).join(' ');
                                     name = `Shader #${info.id} [${lines.substring(0, 25)}...]`;
