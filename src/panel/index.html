@@ -778,11 +778,43 @@
                     <span style="color:#888;">Render</span>
                     <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.renderTime }} ms</span>
                 </div>
+                <div>
+                    <span style="color:#888;">GPU</span>
+                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.gpuTime }} ms</span>
+                </div>
                 <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 2px 0;"></div>
-                <!-- 资源组 -->
+                <!-- 管线组 -->
+                <div>
+                    <span style="color:#888;">ShaderSw</span>
+                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.shaderSwitches }}</span>
+                </div>
+                <div>
+                    <span style="color:#888;">TexBinds</span>
+                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.textureBinds }}</span>
+                </div>
+                <div>
+                    <span style="color:#888;">Verts</span>
+                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.vertices.toLocaleString() }}</span>
+                </div>
+                <div>
+                    <span style="color:#888;">Tris</span>
+                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.triangles.toLocaleString() }}</span>
+                </div>
+                <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 2px 0;"></div>
+                <!-- 物理组 -->
+                <div>
+                    <span style="color:#888;">Physics</span>
+                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.physicsTime }} ms</span>
+                </div>
+                <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 2px 0;"></div>
+                <!-- 内存组 -->
                 <div>
                     <span style="color:#888;">Mem</span>
                     <span style="color:#e0e0e0; margin-left: 6px;">{{ formatBytes(globalState.profiler.tick.totalMemory) }}</span>
+                </div>
+                <div>
+                    <span style="color:#888;">JS Heap</span>
+                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.jsHeapUsed }} / {{ globalState.profiler.tick.jsHeapTotal }} MB</span>
                 </div>
                 <div>
                     <span style="color:#888;">Nodes</span>
