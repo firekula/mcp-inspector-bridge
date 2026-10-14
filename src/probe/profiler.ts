@@ -214,6 +214,11 @@ export function initProfiler() {
                 if (!info) {
                     info = { count: 0, lastUsed: 0, size: '', id: ++textureIdCounter };
                     textureBindDetails.set(texture, info);
+                    // 调试：记录新纹理对象
+                    if (window.__MCP_DEBUG__) {
+                        const isMapped = textureToAssetMap.has(texture);
+                        console.log(`[Profiler] New texture bound: #${info.id}, mapped=${isMapped}, obj=`, texture);
+                    }
                 }
                 info.count++;
                 info.lastUsed = Date.now();
