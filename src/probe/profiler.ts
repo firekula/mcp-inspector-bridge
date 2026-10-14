@@ -488,9 +488,14 @@ export function initProfiler() {
 
     // 着色器与纹理绑定详情接口
     window.__mcpGetShaderTextureDetails = function () {
+        // 统计匹配情况
+        let matchedCount = 0;
+        let totalCount = 0;
+
         // 转换 Map 为数组，按调用次数排序
         const shaders = Array.from(shaderSwitchDetails.entries())
             .map(([program, info]) => {
+                totalCount++;
                 // 获取关联的资源信息
                 const assetInfo = shaderToAssetMap.get(program);
                 let name = `Shader #${info.id}`;
@@ -499,6 +504,7 @@ export function initProfiler() {
                 let assetType = '';
 
                 if (assetInfo) {
+                    matchedCount++;
                     assetUuid = assetInfo.uuid;
                     assetName = assetInfo.name;
                     assetType = assetInfo.type;
@@ -534,6 +540,7 @@ export function initProfiler() {
 
         const textures = Array.from(textureBindDetails.entries())
             .map(([texture, info]) => {
+                totalCount++;
                 // 获取关联的资源信息
                 const assetInfo = textureToAssetMap.get(texture);
                 let name = `Texture #${info.id}`;
@@ -542,6 +549,7 @@ export function initProfiler() {
                 let assetType = '';
 
                 if (assetInfo) {
+                    matchedCount++;
                     assetUuid = assetInfo.uuid;
                     assetName = assetInfo.name;
                     assetType = assetInfo.type;
@@ -561,6 +569,11 @@ export function initProfiler() {
             })
             .sort((a, b) => b.count - a.count)
             .slice(0, 50);
+
+        // 调试输出匹配统计
+        if (window.__MCP_DEBUG__) {
+            console.log(`[Profiler] ShaderTextureDetails: matched=${matchedCount}/${totalCount}, textureMap=${textureToAssetMap.size}, shaderMap=${shaderToAssetMap.size}`);
+        }
 
         return {
             shaderCount: shaderSwitchDetails.size,
