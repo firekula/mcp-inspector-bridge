@@ -54,6 +54,84 @@ export function initProfiler() {
     // WebGL 上下文引用（用于查询信息）
     let cachedGL: any = null;
 
+    // 资源关联映射：WebGL 纹理对象 -> Cocos 资源信息
+    const textureToAssetMap: Map<any, { uuid: string, name: string, type: string }> = new Map();
+    // 着色器关联映射：WebGL Program -> Material/Effect 信息
+    const shaderToAssetMap: Map<any, { uuid: string, name: string, type: string }> = new Map();
+
+    // 构建资源关联映射
+    function buildAssetMapping() {
+        const ccEng = getCcEngine();
+        if (!ccEng || !ccEng.assetManager || !ccEng.assetManager.assets) return;
+
+        try {
+            ccEng.assetManager.assets.forEach((asset: any, uuid: string) => {
+                if (!asset) return;
+
+                // 关联纹理资源
+                if (asset instanceof ccEng.Texture2D || (asset.constructor && asset.constructor.name === 'Texture2D')) {
+                    // Texture2D 的 _texture 属性是底层 WebGL 纹理
+                    const webglTexture = asset._texture;
+                    if (webglTexture) {
+                        textureToAssetMap.set(webglTexture, {
+                            uuid: uuid,
+                            name: asset.name || 'Unnamed',
+                            type: 'Texture2D'
+                        });
+                    }
+                    // 也可能是 _webglObj 或直接就是 WebGL 纹理
+                    if (asset._webglObj) {
+                        textureToAssetMap.set(asset._webglObj, {
+                            uuid: uuid,
+                            name: asset.name || 'Unnamed',
+                            type: 'Texture2D'
+                        });
+                    }
+                }
+
+                // 关联 SpriteFrame 的纹理
+                if (asset instanceof ccEng.SpriteFrame || (asset.constructor && asset.constructor.name === 'SpriteFrame')) {
+                    const tex = asset._texture || (asset.getTexture && asset.getTexture());
+                    if (tex && tex._texture) {
+                        textureToAssetMap.set(tex._texture, {
+                            uuid: uuid,
+                            name: asset.name || 'Unnamed',
+                            type: 'SpriteFrame'
+                        });
+                    }
+                }
+
+                // 关联材质/Effect（着色器来源）
+                if (asset instanceof ccEng.Material || (asset.constructor && asset.constructor.name === 'Material')) {
+                    // Material 有 _effect 属性
+                    const effect = asset._effect;
+                    if (effect && effect._program) {
+                        shaderToAssetMap.set(effect._program, {
+                            uuid: uuid,
+                            name: asset.name || 'Unnamed',
+                            type: 'Material'
+                        });
+                    }
+                }
+
+                // EffectAsset
+                if (asset instanceof ccEng.EffectAsset || (asset.constructor && asset.constructor.name === 'EffectAsset')) {
+                    if (asset._shaders) {
+                        // EffectAsset 包含多个 shader program
+                        // 这里记录 effect 信息供参考
+                    }
+                }
+            });
+        } catch (e) {
+            // 静默失败
+        }
+    }
+
+    // 每 5 秒更新一次资源映射
+    setInterval(buildAssetMapping, 5000);
+    // 立即构建一次
+    setTimeout(buildAssetMapping, 1000);
+
     function tryHookWebGL() {
         if (isWebGLHooked) return;
 
@@ -323,44 +401,76 @@ export function initProfiler() {
         // 转换 Map 为数组，按调用次数排序
         const shaders = Array.from(shaderSwitchDetails.entries())
             .map(([program, info]) => {
-                // 尝试获取着色器信息
+                // 获取关联的资源信息
+                const assetInfo = shaderToAssetMap.get(program);
                 let name = `Shader #${info.id}`;
-                try {
-                    if (cachedGL && program) {
-                        // 获取 program 的着色器信息
-                        const shaders = cachedGL.getAttachedShaders(program);
-                        if (shaders && shaders.length > 0) {
-                            // 尝试获取 shader 源码的前几个字符作为标识
-                            const source = cachedGL.getShaderSource(shaders[0]);
-                            if (source) {
-                                // 提取 main 函数前的注释或关键标识
-                                const lines = source.split('\n').slice(0, 3).join(' ');
-                                name = `Shader #${info.id} [${lines.substring(0, 30)}...]`;
+                let assetUuid = '';
+                let assetName = '';
+                let assetType = '';
+
+                if (assetInfo) {
+                    assetUuid = assetInfo.uuid;
+                    assetName = assetInfo.name;
+                    assetType = assetInfo.type;
+                    name = `${assetInfo.name} (Shader #${info.id})`;
+                } else {
+                    // 尝试获取着色器源码片段
+                    try {
+                        if (cachedGL && program) {
+                            const shaders = cachedGL.getAttachedShaders(program);
+                            if (shaders && shaders.length > 0) {
+                                const source = cachedGL.getShaderSource(shaders[0]);
+                                if (source) {
+                                    const lines = source.split('\n').slice(0, 2).join(' ');
+                                    name = `Shader #${info.id} [${lines.substring(0, 25)}...]`;
+                                }
                             }
                         }
-                    }
-                } catch (e) { }
+                    } catch (e) { }
+                }
 
                 return {
                     id: name,
                     rawId: info.id,
                     count: info.count,
-                    lastUsed: info.lastUsed
+                    lastUsed: info.lastUsed,
+                    assetUuid: assetUuid,
+                    assetName: assetName,
+                    assetType: assetType
                 };
             })
             .sort((a, b) => b.count - a.count)
-            .slice(0, 50); // 只返回前 50 个
+            .slice(0, 50);
 
         const textures = Array.from(textureBindDetails.entries())
-            .map(([texture, info]) => ({
-                id: `Texture #${info.id}`,
-                rawId: info.id,
-                count: info.count,
-                size: info.size,
-                lastUsed: info.lastUsed
-            }))
+            .map(([texture, info]) => {
+                // 获取关联的资源信息
+                const assetInfo = textureToAssetMap.get(texture);
+                let name = `Texture #${info.id}`;
+                let assetUuid = '';
+                let assetName = '';
+                let assetType = '';
+
+                if (assetInfo) {
+                    assetUuid = assetInfo.uuid;
+                    assetName = assetInfo.name;
+                    assetType = assetInfo.type;
+                    name = assetInfo.name;
+                }
+
+                return {
+                    id: name,
+                    rawId: info.id,
+                    count: info.count,
+                    size: info.size,
+                    lastUsed: info.lastUsed,
+                    assetUuid: assetUuid,
+                    assetName: assetName,
+                    assetType: assetType
+                };
+            })
             .sort((a, b) => b.count - a.count)
-            .slice(0, 50); // 只返回前 50 个
+            .slice(0, 50);
 
         return {
             shaderCount: shaderSwitchDetails.size,

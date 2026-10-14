@@ -3,6 +3,7 @@ const { defineComponent, ref, computed, toRefs } = require('vue');
 /**
  * 着色器与纹理绑定详情组件
  * 展示详细的 Shader 切换和纹理绑定统计，帮助诊断渲染性能问题
+ * 支持点击跳转到编辑器资源管理器
  */
 export const ShaderTextureDetail = defineComponent({
     name: 'ShaderTextureDetail',
@@ -18,7 +19,8 @@ export const ShaderTextureDetail = defineComponent({
             })
         }
     },
-    setup(props: any) {
+    emits: ['locate-asset'],
+    setup(props: any, { emit }: any) {
         const { details } = toRefs(props);
 
         const activeTab = ref('shaders');
@@ -47,12 +49,20 @@ export const ShaderTextureDetail = defineComponent({
             return `${Math.floor(diff / 60000)}分钟前`;
         };
 
+        // 跳转到资源
+        const locateAsset = (item: any) => {
+            if (item && item.assetUuid) {
+                emit('locate-asset', item.assetUuid);
+            }
+        };
+
         return {
             activeTab,
             sortBy,
             sortedShaders,
             sortedTextures,
-            formatTime
+            formatTime,
+            locateAsset
         };
     },
     template: `
@@ -104,11 +114,12 @@ export const ShaderTextureDetail = defineComponent({
                                 <th>着色器标识</th>
                                 <th>切换次数 ⬇</th>
                                 <th>最近使用</th>
+                                <th>操作</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr v-for="(shader, idx) in sortedShaders" :key="idx">
-                                <td class="shader-id">{{ shader.id }}</td>
+                                <td class="shader-id" :title="shader.id">{{ shader.id }}</td>
                                 <td>
                                     <div class="count-bar">
                                         <div class="count-fill" :style="{ width: Math.min((shader.count / (sortedShaders[0]?.count || 1)) * 100, 100) + '%' }"></div>
@@ -116,9 +127,14 @@ export const ShaderTextureDetail = defineComponent({
                                     </div>
                                 </td>
                                 <td class="time-text">{{ formatTime(shader.lastUsed) }}</td>
+                                <td>
+                                    <button v-if="shader.assetUuid" class="locate-btn" @click="locateAsset(shader)"
+                                        :title="'在资源管理器中定位: ' + shader.assetName">🎯 定位</button>
+                                    <span v-else class="no-asset">-</span>
+                                </td>
                             </tr>
                             <tr v-if="sortedShaders.length === 0">
-                                <td colspan="3" class="empty-row">暂无数据</td>
+                                <td colspan="4" class="empty-row">暂无数据</td>
                             </tr>
                         </tbody>
                     </table>
@@ -133,11 +149,12 @@ export const ShaderTextureDetail = defineComponent({
                                 <th>尺寸</th>
                                 <th>绑定次数 ⬇</th>
                                 <th>最近使用</th>
+                                <th>操作</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr v-for="(texture, idx) in sortedTextures" :key="idx">
-                                <td class="texture-id">{{ texture.id }}</td>
+                                <td class="texture-id" :title="texture.id">{{ texture.id }}</td>
                                 <td class="size-text">{{ texture.size || '-' }}</td>
                                 <td>
                                     <div class="count-bar">
@@ -146,9 +163,14 @@ export const ShaderTextureDetail = defineComponent({
                                     </div>
                                 </td>
                                 <td class="time-text">{{ formatTime(texture.lastUsed) }}</td>
+                                <td>
+                                    <button v-if="texture.assetUuid" class="locate-btn" @click="locateAsset(texture)"
+                                        :title="'在资源管理器中定位: ' + texture.assetName">🎯 定位</button>
+                                    <span v-else class="no-asset">-</span>
+                                </td>
                             </tr>
                             <tr v-if="sortedTextures.length === 0">
-                                <td colspan="4" class="empty-row">暂无数据</td>
+                                <td colspan="5" class="empty-row">暂无数据</td>
                             </tr>
                         </tbody>
                     </table>
@@ -162,6 +184,7 @@ export const ShaderTextureDetail = defineComponent({
                     <li>着色器切换过多：检查材质排序，合并相似材质，减少状态切换</li>
                     <li>纹理绑定过多：使用图集(Texture Atlas)，合并小纹理，减少纹理切换</li>
                     <li>批次优化：相同材质/纹理的节点尽量连续渲染</li>
+                    <li>点击 🎯 定位按钮可跳转到资源管理器查看具体资源</li>
                 </ul>
             </div>
         </div>

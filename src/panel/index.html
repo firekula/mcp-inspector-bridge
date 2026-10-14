@@ -918,6 +918,26 @@
         font-size: calc(var(--base-font-size, 13px) - 1px);
         line-height: 1.8;
     }
+
+    .locate-btn {
+        background: #2a72b8;
+        color: #fff;
+        border: none;
+        border-radius: 3px;
+        padding: 3px 8px;
+        cursor: pointer;
+        font-size: calc(var(--base-font-size, 13px) - 2px);
+        white-space: nowrap;
+        transition: background 0.2s;
+    }
+
+    .locate-btn:hover {
+        background: #3d8fd6;
+    }
+
+    .no-asset {
+        color: #555;
+    }
 </style>
 
 <div id="app" v-cloak>
@@ -1518,7 +1538,8 @@
                     </div>
                     <div style="padding: 10px;">
                         <shader-texture-detail
-                            :details="globalState.profiler.shaderTextureDetails">
+                            :details="globalState.profiler.shaderTextureDetails"
+                            @locate-asset="onLocateAsset">
                         </shader-texture-detail>
                     </div>
                 </div>
