@@ -737,6 +737,187 @@
         border-radius: 4px;
         border: 1px solid #333;
     }
+
+    /* 着色器与纹理绑定详情组件样式 */
+    .shader-texture-detail {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .detail-summary {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    .summary-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .summary-label {
+        font-size: calc(var(--base-font-size, 13px) - 2px);
+        color: #888;
+    }
+
+    .summary-value {
+        font-family: 'Consolas', monospace;
+        font-size: calc(var(--base-font-size, 13px) + 2px);
+        font-weight: bold;
+        color: #4caf50;
+    }
+
+    .summary-value.warn {
+        color: #ff9800;
+    }
+
+    .detail-tabs {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .detail-tab {
+        padding: 6px 14px;
+        background: #333;
+        border: 1px solid #444;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: calc(var(--base-font-size, 13px) - 1px);
+        color: #aaa;
+        transition: all 0.2s;
+    }
+
+    .detail-tab:hover {
+        background: #444;
+    }
+
+    .detail-tab.active {
+        background: #007acc;
+        border-color: #007acc;
+        color: #fff;
+    }
+
+    .detail-sort {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: calc(var(--base-font-size, 13px) - 1px);
+        color: #888;
+    }
+
+    .sort-select {
+        background: #333;
+        color: #ddd;
+        border: 1px solid #555;
+        border-radius: 3px;
+        padding: 3px 6px;
+        font-size: calc(var(--base-font-size, 13px) - 1px);
+    }
+
+    .detail-list {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .detail-table-wrap {
+        overflow-x: auto;
+    }
+
+    .detail-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: calc(var(--base-font-size, 13px) - 1px);
+    }
+
+    .detail-table thead {
+        position: sticky;
+        top: 0;
+        background: #2a2a2a;
+        z-index: 1;
+    }
+
+    .detail-table th {
+        padding: 6px 10px;
+        text-align: left;
+        color: #888;
+        border-bottom: 1px solid #444;
+    }
+
+    .detail-table td {
+        padding: 5px 10px;
+        border-bottom: 1px solid #2a2a2a;
+    }
+
+    .shader-id, .texture-id {
+        color: #9c27b0;
+        font-family: 'Consolas', monospace;
+    }
+
+    .size-text {
+        color: #2196f3;
+        font-family: 'Consolas', monospace;
+    }
+
+    .time-text {
+        color: #888;
+    }
+
+    .count-bar {
+        position: relative;
+        height: 18px;
+        background: #333;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .count-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #4caf50, #ff9800);
+        transition: width 0.3s;
+    }
+
+    .count-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-family: 'Consolas', monospace;
+        font-size: 11px;
+        color: #fff;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    .empty-row {
+        text-align: center;
+        color: #666;
+        padding: 20px !important;
+    }
+
+    .detail-hints {
+        background: #2a2a2a;
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 10px 14px;
+    }
+
+    .hint-title {
+        font-weight: bold;
+        color: #4caf50;
+        margin-bottom: 8px;
+        font-size: calc(var(--base-font-size, 13px) - 1px);
+    }
+
+    .hint-list {
+        margin: 0;
+        padding-left: 20px;
+        color: #aaa;
+        font-size: calc(var(--base-font-size, 13px) - 1px);
+        line-height: 1.8;
+    }
 </style>
 
 <div id="app" v-cloak>
@@ -1326,6 +1507,19 @@
                             :width="600"
                             :height="200">
                         </memory-timeline>
+                    </div>
+                </div>
+
+                <!-- 着色器与纹理绑定详情 -->
+                <div style="flex-shrink: 0; background: #222; border: 1px solid #333; border-radius: 4px; overflow: hidden;">
+                    <div
+                        style="background: #2a2a2a; padding: 6px 10px; font-weight: bold; font-size: calc(var(--base-font-size, 13px) - 1px); border-bottom: 1px solid #444; color: #e0e0e0;">
+                        着色器与纹理绑定详情
+                    </div>
+                    <div style="padding: 10px;">
+                        <shader-texture-detail
+                            :details="globalState.profiler.shaderTextureDetails">
+                        </shader-texture-detail>
                     </div>
                 </div>
 

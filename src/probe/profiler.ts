@@ -44,6 +44,11 @@ export function initProfiler() {
     let frameTriangles = 0;
     let frameDrawCalls = 0;
 
+    // 着色器切换详情记录
+    const shaderSwitchDetails: Map<any, { count: number, lastUsed: number }> = new Map();
+    // 纹理绑定详情记录
+    const textureBindDetails: Map<any, { count: number, lastUsed: number, size: string }> = new Map();
+
     function tryHookWebGL() {
         if (isWebGLHooked) return;
 
@@ -60,13 +65,32 @@ export function initProfiler() {
         const originalUseProgram = gl.useProgram.bind(gl);
         gl.useProgram = function (program: any) {
             frameShaderSwitches++;
+            if (program) {
+                const info = shaderSwitchDetails.get(program) || { count: 0, lastUsed: 0 };
+                info.count++;
+                info.lastUsed = Date.now();
+                shaderSwitchDetails.set(program, info);
+            }
             return originalUseProgram(program);
         };
 
         // Hook bindTexture - 纹理绑定
         const originalBindTexture = gl.bindTexture.bind(gl);
         gl.bindTexture = function (target: number, texture: any) {
-            if (texture) frameTextureBinds++;
+            if (texture) {
+                frameTextureBinds++;
+                const info = textureBindDetails.get(texture) || { count: 0, lastUsed: 0, size: '' };
+                info.count++;
+                info.lastUsed = Date.now();
+                // 尝试获取纹理尺寸
+                try {
+                    const level = 0;
+                    const width = gl.getTexLevelParameter(target, level, gl.TEXTURE_WIDTH);
+                    const height = gl.getTexLevelParameter(target, level, gl.TEXTURE_HEIGHT);
+                    if (width && height) info.size = `${width}x${height}`;
+                } catch (e) { }
+                textureBindDetails.set(texture, info);
+            }
             return originalBindTexture(target, texture);
         };
 
@@ -280,6 +304,47 @@ export function initProfiler() {
             return n;
         }
         return count(scene);
+    };
+
+    // 着色器与纹理绑定详情接口
+    window.__mcpGetShaderTextureDetails = function () {
+        // 转换 Map 为数组，按调用次数排序
+        const shaders = Array.from(shaderSwitchDetails.entries())
+            .map(([program, info]) => ({
+                id: `shader_${program.__id || 'unknown'}`,
+                count: info.count,
+                lastUsed: info.lastUsed
+            }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 50); // 只返回前 50 个
+
+        const textures = Array.from(textureBindDetails.entries())
+            .map(([texture, info]) => ({
+                id: `texture_${texture.__id || 'unknown'}`,
+                count: info.count,
+                size: info.size,
+                lastUsed: info.lastUsed
+            }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 50); // 只返回前 50 个
+
+        return {
+            shaderCount: shaderSwitchDetails.size,
+            textureCount: textureBindDetails.size,
+            shaders,
+            textures,
+            summary: {
+                totalShaderSwitches: Array.from(shaderSwitchDetails.values()).reduce((s, v) => s + v.count, 0),
+                totalTextureBinds: Array.from(textureBindDetails.values()).reduce((s, v) => s + v.count, 0)
+            }
+        };
+    };
+
+    // 清空详情记录
+    window.__mcpClearShaderTextureDetails = function () {
+        shaderSwitchDetails.clear();
+        textureBindDetails.clear();
+        return { success: true };
     };
 
     // 帧时间历史数据接口：用于绘制帧时间波形图

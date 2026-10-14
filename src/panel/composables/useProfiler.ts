@@ -122,6 +122,19 @@ export function useProfiler(globalState: any, gameView: any, activeTab: any) {
                             } catch (e) {}
                         }
                     }).catch(() => {});
+
+                    // 获取着色器/纹理详情
+                    wvNow.executeJavaScript(
+                        'window.__mcpGetShaderTextureDetails ? JSON.stringify(window.__mcpGetShaderTextureDetails()) : null'
+                    ).then((res: string) => {
+                        if (res) {
+                            try {
+                                const data = JSON.parse(res);
+                                Object.assign(globalState.profiler.shaderTextureDetails, data);
+                                globalState.profiler.shaderTextureDetails.lastUpdate = Date.now();
+                            } catch (e) {}
+                        }
+                    }).catch(() => {});
                 } catch (e) {}
             }, 2000);
         }

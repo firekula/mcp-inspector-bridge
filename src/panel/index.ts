@@ -9,6 +9,7 @@ const { RenderDebugger } = require('./components/RenderDebugger');
 const { ScriptManager } = require('./components/ScriptManager');
 const { FrameTimeline } = require('./components/FrameTimeline');
 const { MemoryTimeline } = require('./components/MemoryTimeline');
+const { ShaderTextureDetail } = require('./components/ShaderTextureDetail');
 const { useScriptSystem } = require('./composables/useScriptSystem');
 
 // 模块级引用，供 messages handlers 访问
@@ -47,7 +48,7 @@ module.exports = Editor.Panel.extend({
 
         try {
             const app = createApp({
-                components: { NodeTree, 'node-inspector': NodeInspector, 'render-debugger': RenderDebugger, 'script-manager': ScriptManager, 'frame-timeline': FrameTimeline, 'memory-timeline': MemoryTimeline },
+                components: { NodeTree, 'node-inspector': NodeInspector, 'render-debugger': RenderDebugger, 'script-manager': ScriptManager, 'frame-timeline': FrameTimeline, 'memory-timeline': MemoryTimeline, 'shader-texture-detail': ShaderTextureDetail },
                 setup() {
                     const activeTab = ref(0);
                     const activeSettingSubTab = ref('appearance' as 'appearance' | 'network-mcp' | 'media-res' | 'logs-diag');
