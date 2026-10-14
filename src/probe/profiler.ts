@@ -34,8 +34,62 @@ export function initProfiler() {
     let lastFrameTime = 0;
 
     let isEventsHooked = false;
-    let isRendererHooked = false;
+    let isWebGLHooked = false;
     let isPhysicsHooked = false;
+
+    // WebGL 统计计数器（每帧重置）
+    let frameShaderSwitches = 0;
+    let frameTextureBinds = 0;
+    let frameVertices = 0;
+    let frameTriangles = 0;
+    let frameDrawCalls = 0;
+
+    function tryHookWebGL() {
+        if (isWebGLHooked) return;
+
+        // 获取 WebGL 上下文（从 canvas）
+        const canvas = document.querySelector('canvas');
+        if (!canvas) return;
+
+        const gl = canvas.getContext('webgl') || canvas.getContext('webgl2');
+        if (!gl) return;
+
+        isWebGLHooked = true;
+
+        // Hook useProgram - Shader 切换
+        const originalUseProgram = gl.useProgram.bind(gl);
+        gl.useProgram = function (program: any) {
+            frameShaderSwitches++;
+            return originalUseProgram(program);
+        };
+
+        // Hook bindTexture - 纹理绑定
+        const originalBindTexture = gl.bindTexture.bind(gl);
+        gl.bindTexture = function (target: number, texture: any) {
+            if (texture) frameTextureBinds++;
+            return originalBindTexture(target, texture);
+        };
+
+        // Hook drawArrays - 统计顶点和三角形
+        const originalDrawArrays = gl.drawArrays.bind(gl);
+        gl.drawArrays = function (mode: number, first: number, count: number) {
+            frameDrawCalls++;
+            frameVertices += count;
+            if (mode === gl.TRIANGLES) frameTriangles += count / 3;
+            else if (mode === gl.TRIANGLE_STRIP || mode === gl.TRIANGLE_FAN) frameTriangles += Math.max(0, count - 2);
+            return originalDrawArrays(mode, first, count);
+        };
+
+        // Hook drawElements - 统计顶点和三角形
+        const originalDrawElements = gl.drawElements.bind(gl);
+        gl.drawElements = function (mode: number, count: number, type: number, offset: number) {
+            frameDrawCalls++;
+            frameVertices += count;
+            if (mode === gl.TRIANGLES) frameTriangles += count / 3;
+            else if (mode === gl.TRIANGLE_STRIP || mode === gl.TRIANGLE_FAN) frameTriangles += Math.max(0, count - 2);
+            return originalDrawElements(mode, count, type, offset);
+        };
+    }
 
     function tryHookDirectorEvents() {
         if (isEventsHooked) return;
@@ -64,10 +118,21 @@ export function initProfiler() {
         // 实时渲染消耗窃听器
         ccEng.director.on(ccEng.Director.EVENT_BEFORE_DRAW, () => {
             renderStart = performance.now();
+            // 每帧开始时重置 WebGL 统计
+            frameShaderSwitches = 0;
+            frameTextureBinds = 0;
+            frameVertices = 0;
+            frameTriangles = 0;
+            frameDrawCalls = 0;
         });
         ccEng.director.on(ccEng.Director.EVENT_AFTER_DRAW, () => {
             accumulatedRenderTime += (performance.now() - renderStart);
             renderFrames++;
+            // 累加 WebGL 统计
+            accumulatedShaderSwitches += frameShaderSwitches;
+            accumulatedTextureBinds += frameTextureBinds;
+            accumulatedVertices += frameVertices;
+            accumulatedTriangles += frameTriangles;
         });
 
         // 物理步进耗时窃听器
@@ -85,21 +150,8 @@ export function initProfiler() {
         }
     }
 
-    function tryHookRenderer() {
-        if (isRendererHooked) return;
-        const ccEng = getCcEngine();
-        if (!ccEng || !ccEng.renderer) return;
-        
-        // 尝试 hook renderer 的关键指标
-        const renderer = ccEng.renderer;
-        
-        // Hook drawCalls 读取时顺便采集其他统计
-        // 注意：Cocos Creator 2.4 的 renderer 统计可能在不同属性下
-        isRendererHooked = true;
-    }
-
     tryHookDirectorEvents();
-    tryHookRenderer();
+    tryHookWebGL();
 
     // 缓存给主进程轮询拿的变量
     let displayLogicTime = 0;
@@ -115,7 +167,7 @@ export function initProfiler() {
 
     setInterval(() => {
         tryHookDirectorEvents();
-        tryHookRenderer();
+        tryHookWebGL();
         const ccEng = getCcEngine();
         if (!ccEng || !ccEng.director) return;
 
@@ -138,10 +190,22 @@ export function initProfiler() {
         displayTriangles = Math.round(accumulatedTriangles / Math.max(renderFrames, 1));
         displayPhysicsTime = physicsFrames > 0 ? Number((accumulatedPhysicsTime / physicsFrames).toFixed(2)) : 0;
 
-        // JS Heap 内存
-        if (typeof performance !== 'undefined' && performance.memory) {
-            displayJsHeapUsed = Math.round(performance.memory.usedJSHeapSize / 1024 / 1024 * 100) / 100; // MB
-            displayJsHeapTotal = Math.round(performance.memory.totalJSHeapSize / 1024 / 1024 * 100) / 100; // MB
+        // JS Heap 内存 - 尝试多种方式
+        if (typeof performance !== 'undefined') {
+            // 方式1: performance.memory (Chrome/Electron)
+            if ((performance as any).memory) {
+                displayJsHeapUsed = Math.round((performance as any).memory.usedJSHeapSize / 1024 / 1024 * 100) / 100;
+                displayJsHeapTotal = Math.round((performance as any).memory.totalJSHeapSize / 1024 / 1024 * 100) / 100;
+            }
+            // 方式2: performance.measureUserAgentSpecificMemory (需要 await，异步)
+            // 方式3: process.memoryUsage (Node.js/Electron renderer)
+            else if (typeof process !== 'undefined' && process.memoryUsage) {
+                try {
+                    const mem = process.memoryUsage();
+                    displayJsHeapUsed = Math.round(mem.heapUsed / 1024 / 1024 * 100) / 100;
+                    displayJsHeapTotal = Math.round(mem.heapTotal / 1024 / 1024 * 100) / 100;
+                } catch (e) { }
+            }
         }
 
         // 重置累加器
@@ -161,53 +225,15 @@ export function initProfiler() {
     }, 500); // 也是 500ms，和 FPS 一起刷新平滑
 
     window.__mcpProfilerTick = function () {
-        // 读取 DrawCall: 它是单帧即时数据，可以直接拿 renderer 的
-        let drawCall = 0;
-        let shaderSwitches = 0;
-        let textureBinds = 0;
-        let vertices = 0;
-        let triangles = 0;
-        let gpuTime = 0;
+        // 读取 DrawCall: 优先从 WebGL hook 获取，回退到 renderer
+        let drawCall = frameDrawCalls;
         const ccEng = getCcEngine();
 
         try {
-            if (ccEng && ccEng.renderer) {
-                const renderer = ccEng.renderer;
-                if (typeof renderer.drawCalls !== 'undefined') {
-                    drawCall = renderer.drawCalls;
-                }
-                // 尝试读取 Cocos Creator 2.4 renderer 的统计信息
-                if (renderer.stats) {
-                    shaderSwitches = renderer.stats.shaderSwitches || 0;
-                    textureBinds = renderer.stats.textureBinds || 0;
-                    vertices = renderer.stats.vertices || 0;
-                    triangles = renderer.stats.triangles || 0;
-                }
-                if (renderer.profiler_stats) {
-                    shaderSwitches = renderer.profiler_stats.shaderSwitches || shaderSwitches;
-                    textureBinds = renderer.profiler_stats.textureBinds || textureBinds;
-                    vertices = renderer.profiler_stats.vertices || vertices;
-                    triangles = renderer.profiler_stats.triangles || triangles;
-                }
-                // GPU 时间（如果支持 EXT_disjoint_timer_query）
-                if (renderer.device && typeof renderer.device.getTimestamp === 'function') {
-                    // 这需要 WebGL2 + EXT_disjoint_timer_query 扩展
-                    // 这里仅作预留，实际可用性取决于运行环境
-                }
-            } else if (ccEng && ccEng.profiler_stats) {
-                drawCall = ccEng.profiler_stats.drawCall || 0;
-                shaderSwitches = ccEng.profiler_stats.shaderSwitches || 0;
-                textureBinds = ccEng.profiler_stats.textureBinds || 0;
-                vertices = ccEng.profiler_stats.vertices || 0;
-                triangles = ccEng.profiler_stats.triangles || 0;
+            if (drawCall === 0 && ccEng && ccEng.renderer && typeof ccEng.renderer.drawCalls !== 'undefined') {
+                drawCall = ccEng.renderer.drawCalls;
             }
         } catch (e) { }
-
-        // 累加到区间统计
-        accumulatedShaderSwitches += shaderSwitches;
-        accumulatedTextureBinds += textureBinds;
-        accumulatedVertices += vertices;
-        accumulatedTriangles += triangles;
 
         // 计算帧率分位统计
         let avgFps = 0, fps1pLow = 0, fps01pLow = 0;
@@ -282,9 +308,15 @@ export function initProfiler() {
         let jsHeapUsed = 0;
         let jsHeapTotal = 0;
 
-        if (typeof performance !== 'undefined' && performance.memory) {
-            jsHeapUsed = performance.memory.usedJSHeapSize;
-            jsHeapTotal = performance.memory.totalJSHeapSize;
+        if (typeof performance !== 'undefined' && (performance as any).memory) {
+            jsHeapUsed = (performance as any).memory.usedJSHeapSize;
+            jsHeapTotal = (performance as any).memory.totalJSHeapSize;
+        } else if (typeof process !== 'undefined' && process.memoryUsage) {
+            try {
+                const mem = process.memoryUsage();
+                jsHeapUsed = mem.heapUsed;
+                jsHeapTotal = mem.heapTotal;
+            } catch (e) { }
         }
 
         // 获取资源内存总量
