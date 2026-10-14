@@ -45,9 +45,14 @@ export function initProfiler() {
     let frameDrawCalls = 0;
 
     // 着色器切换详情记录
-    const shaderSwitchDetails: Map<any, { count: number, lastUsed: number }> = new Map();
+    const shaderSwitchDetails: Map<any, { count: number, lastUsed: number, id: number }> = new Map();
     // 纹理绑定详情记录
-    const textureBindDetails: Map<any, { count: number, lastUsed: number, size: string }> = new Map();
+    const textureBindDetails: Map<any, { count: number, lastUsed: number, size: string, id: number }> = new Map();
+    // 自增 ID 计数器
+    let shaderIdCounter = 0;
+    let textureIdCounter = 0;
+    // WebGL 上下文引用（用于查询信息）
+    let cachedGL: any = null;
 
     function tryHookWebGL() {
         if (isWebGLHooked) return;
@@ -60,16 +65,20 @@ export function initProfiler() {
         if (!gl) return;
 
         isWebGLHooked = true;
+        cachedGL = gl;
 
         // Hook useProgram - Shader 切换
         const originalUseProgram = gl.useProgram.bind(gl);
         gl.useProgram = function (program: any) {
             frameShaderSwitches++;
             if (program) {
-                const info = shaderSwitchDetails.get(program) || { count: 0, lastUsed: 0 };
+                let info = shaderSwitchDetails.get(program);
+                if (!info) {
+                    info = { count: 0, lastUsed: 0, id: ++shaderIdCounter };
+                    shaderSwitchDetails.set(program, info);
+                }
                 info.count++;
                 info.lastUsed = Date.now();
-                shaderSwitchDetails.set(program, info);
             }
             return originalUseProgram(program);
         };
@@ -79,7 +88,11 @@ export function initProfiler() {
         gl.bindTexture = function (target: number, texture: any) {
             if (texture) {
                 frameTextureBinds++;
-                const info = textureBindDetails.get(texture) || { count: 0, lastUsed: 0, size: '' };
+                let info = textureBindDetails.get(texture);
+                if (!info) {
+                    info = { count: 0, lastUsed: 0, size: '', id: ++textureIdCounter };
+                    textureBindDetails.set(texture, info);
+                }
                 info.count++;
                 info.lastUsed = Date.now();
                 // 尝试获取纹理尺寸
@@ -89,7 +102,6 @@ export function initProfiler() {
                     const height = gl.getTexLevelParameter(target, level, gl.TEXTURE_HEIGHT);
                     if (width && height) info.size = `${width}x${height}`;
                 } catch (e) { }
-                textureBindDetails.set(texture, info);
             }
             return originalBindTexture(target, texture);
         };
@@ -310,17 +322,39 @@ export function initProfiler() {
     window.__mcpGetShaderTextureDetails = function () {
         // 转换 Map 为数组，按调用次数排序
         const shaders = Array.from(shaderSwitchDetails.entries())
-            .map(([program, info]) => ({
-                id: `shader_${program.__id || 'unknown'}`,
-                count: info.count,
-                lastUsed: info.lastUsed
-            }))
+            .map(([program, info]) => {
+                // 尝试获取着色器信息
+                let name = `Shader #${info.id}`;
+                try {
+                    if (cachedGL && program) {
+                        // 获取 program 的着色器信息
+                        const shaders = cachedGL.getAttachedShaders(program);
+                        if (shaders && shaders.length > 0) {
+                            // 尝试获取 shader 源码的前几个字符作为标识
+                            const source = cachedGL.getShaderSource(shaders[0]);
+                            if (source) {
+                                // 提取 main 函数前的注释或关键标识
+                                const lines = source.split('\n').slice(0, 3).join(' ');
+                                name = `Shader #${info.id} [${lines.substring(0, 30)}...]`;
+                            }
+                        }
+                    }
+                } catch (e) { }
+
+                return {
+                    id: name,
+                    rawId: info.id,
+                    count: info.count,
+                    lastUsed: info.lastUsed
+                };
+            })
             .sort((a, b) => b.count - a.count)
             .slice(0, 50); // 只返回前 50 个
 
         const textures = Array.from(textureBindDetails.entries())
             .map(([texture, info]) => ({
-                id: `texture_${texture.__id || 'unknown'}`,
+                id: `Texture #${info.id}`,
+                rawId: info.id,
                 count: info.count,
                 size: info.size,
                 lastUsed: info.lastUsed
