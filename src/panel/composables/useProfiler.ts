@@ -5,6 +5,7 @@ export function useProfiler(globalState: any, gameView: any, activeTab: any) {
     let memoryRankTimer: any = null;
     let memoryTimer: any = null;
     let nodeCountTimer: any = null;
+    let frameTimelineTimer: any = null;
 
     const startTickPolling = () => {
         if (tickTimer) return;
@@ -63,12 +64,36 @@ export function useProfiler(globalState: any, gameView: any, activeTab: any) {
                 } catch (e) {}
             }, 2000);
         }
+
+        // 帧时间历史轮询：500ms 间隔，更新帧时间波形图
+        if (!frameTimelineTimer) {
+            frameTimelineTimer = setInterval(() => {
+                const wvNow: any = gameView.value;
+                if (!wvNow || (typeof wvNow.isConnected === 'boolean' && !wvNow.isConnected)) return;
+                try { wvNow.getWebContentsId(); } catch (e) { return; }
+                try {
+                    wvNow.executeJavaScript(
+                        'window.__mcpGetFrameTimeline ? JSON.stringify(window.__mcpGetFrameTimeline()) : null'
+                    ).then((res: string) => {
+                        if (res) {
+                            try {
+                                const data = JSON.parse(res);
+                                globalState.profiler.frameTimeline.frameTimes = data.frameTimes || [];
+                                globalState.profiler.frameTimeline.capacity = data.capacity || 600;
+                                globalState.profiler.frameTimeline.lastUpdate = Date.now();
+                            } catch (e) {}
+                        }
+                    }).catch(() => {});
+                } catch (e) {}
+            }, 500);
+        }
     };
 
     const stopTickPolling = () => {
         if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
         if (memoryTimer) { clearInterval(memoryTimer); memoryTimer = null; }
         if (nodeCountTimer) { clearInterval(nodeCountTimer); nodeCountTimer = null; }
+        if (frameTimelineTimer) { clearInterval(frameTimelineTimer); frameTimelineTimer = null; }
     };
 
     const setupProfilerWatchers = () => {

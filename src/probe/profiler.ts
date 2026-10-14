@@ -255,4 +255,13 @@ export function initProfiler() {
         }
         return count(scene);
     };
+
+    // 帧时间历史数据接口：用于绘制帧时间波形图
+    window.__mcpGetFrameTimeline = function () {
+        // 返回最近的帧时间数组（ms）以及对应的统计信息
+        return {
+            frameTimes: [...frameDeltas],
+            capacity: FRAME_TIME_WINDOW
+        };
+    };
 }

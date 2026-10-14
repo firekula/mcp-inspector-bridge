@@ -12,15 +12,15 @@ export const globalState = reactive({
     isNarrow: false as boolean,
     webviewSrc: '' as string,
     profiler: {
-        tick: { 
-            fps: 0, 
-            avgFps: 0, 
-            fps1pLow: 0, 
-            fps01pLow: 0, 
-            drawCall: 0, 
-            logicTime: 0, 
-            renderTime: 0, 
-            totalMemory: 0, 
+        tick: {
+            fps: 0,
+            avgFps: 0,
+            fps1pLow: 0,
+            fps01pLow: 0,
+            drawCall: 0,
+            logicTime: 0,
+            renderTime: 0,
+            totalMemory: 0,
             nodeCount: 0,
             gpuTime: 0,
             shaderSwitches: 0,
@@ -32,7 +32,12 @@ export const globalState = reactive({
             jsHeapTotal: 0
         },
         memoryStats: null as any,
-        expandedBundles: {} as any
+        expandedBundles: {} as any,
+        frameTimeline: {
+            frameTimes: [] as number[],
+            capacity: 600,
+            lastUpdate: 0
+        }
     },
     renderDebugger: {
         snapshots: [] as any[],

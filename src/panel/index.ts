@@ -7,6 +7,7 @@ const { NodeTree } = require('./components/NodeTree');
 const { NodeInspector } = require('./components/NodeInspector');
 const { RenderDebugger } = require('./components/RenderDebugger');
 const { ScriptManager } = require('./components/ScriptManager');
+const { FrameTimeline } = require('./components/FrameTimeline');
 const { useScriptSystem } = require('./composables/useScriptSystem');
 
 // 模块级引用，供 messages handlers 访问
@@ -45,7 +46,7 @@ module.exports = Editor.Panel.extend({
 
         try {
             const app = createApp({
-                components: { NodeTree, 'node-inspector': NodeInspector, 'render-debugger': RenderDebugger, 'script-manager': ScriptManager },
+                components: { NodeTree, 'node-inspector': NodeInspector, 'render-debugger': RenderDebugger, 'script-manager': ScriptManager, 'frame-timeline': FrameTimeline },
                 setup() {
                     const activeTab = ref(0);
                     const activeSettingSubTab = ref('appearance' as 'appearance' | 'network-mcp' | 'media-res' | 'logs-diag');
