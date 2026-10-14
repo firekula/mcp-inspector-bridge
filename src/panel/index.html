@@ -841,75 +841,75 @@
                        pointer-events: none; user-select: none;">
                 <!-- 帧率组 -->
                 <div>
-                    <span style="color:#888;">FPS</span>
+                    <span style="color:#888;">帧率</span>
                     <span :style="{color: statsFpsColor, fontWeight: 'bold', marginLeft: '6px'}">{{ globalState.profiler.tick.fps }}</span>
                 </div>
                 <div>
-                    <span style="color:#888;">Avg</span>
+                    <span style="color:#888;">平均</span>
                     <span :style="{color: statsAvgFpsColor, marginLeft: '6px'}">{{ globalState.profiler.tick.avgFps }}</span>
                 </div>
                 <div>
-                    <span style="color:#888;">1%Low</span>
+                    <span style="color:#888;">1%最低</span>
                     <span :style="{color: stats1pLowColor, marginLeft: '6px'}">{{ globalState.profiler.tick.fps1pLow }}</span>
                 </div>
                 <div>
-                    <span style="color:#888;">0.1%Low</span>
+                    <span style="color:#888;">0.1%最低</span>
                     <span :style="{color: stats01pLowColor, marginLeft: '6px'}">{{ globalState.profiler.tick.fps01pLow }}</span>
                 </div>
                 <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 2px 0;"></div>
                 <!-- 渲染组 -->
                 <div>
-                    <span style="color:#888;">DrawCall</span>
+                    <span style="color:#888;">绘制调用</span>
                     <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.drawCall }}</span>
                 </div>
                 <div>
-                    <span style="color:#888;">Logic</span>
+                    <span style="color:#888;">逻辑耗时</span>
                     <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.logicTime }} ms</span>
                 </div>
                 <div>
-                    <span style="color:#888;">Render</span>
+                    <span style="color:#888;">渲染耗时</span>
                     <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.renderTime }} ms</span>
                 </div>
                 <div>
-                    <span style="color:#888;">GPU</span>
+                    <span style="color:#888;">GPU耗时</span>
                     <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.gpuTime }} ms</span>
                 </div>
                 <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 2px 0;"></div>
                 <!-- 管线组 -->
                 <div>
-                    <span style="color:#888;">ShaderSw</span>
+                    <span style="color:#888;">着色器切换</span>
                     <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.shaderSwitches }}</span>
                 </div>
                 <div>
-                    <span style="color:#888;">TexBinds</span>
+                    <span style="color:#888;">纹理绑定</span>
                     <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.textureBinds }}</span>
                 </div>
                 <div>
-                    <span style="color:#888;">Verts</span>
+                    <span style="color:#888;">顶点数</span>
                     <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.vertices.toLocaleString() }}</span>
                 </div>
                 <div>
-                    <span style="color:#888;">Tris</span>
+                    <span style="color:#888;">三角面</span>
                     <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.triangles.toLocaleString() }}</span>
                 </div>
                 <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 2px 0;"></div>
                 <!-- 物理组 -->
                 <div>
-                    <span style="color:#888;">Physics</span>
+                    <span style="color:#888;">物理耗时</span>
                     <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.physicsTime }} ms</span>
                 </div>
                 <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 2px 0;"></div>
                 <!-- 内存组 -->
                 <div>
-                    <span style="color:#888;">Mem</span>
+                    <span style="color:#888;">资源内存</span>
                     <span style="color:#e0e0e0; margin-left: 6px;">{{ formatBytes(globalState.profiler.tick.totalMemory) }}</span>
                 </div>
                 <div>
-                    <span style="color:#888;">JS Heap</span>
+                    <span style="color:#888;">JS堆内存</span>
                     <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.jsHeapUsed }} / {{ globalState.profiler.tick.jsHeapTotal }} MB</span>
                 </div>
                 <div>
-                    <span style="color:#888;">Nodes</span>
+                    <span style="color:#888;">节点数</span>
                     <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.nodeCount.toLocaleString() }}</span>
                 </div>
             </div>
@@ -1280,23 +1280,23 @@
                 </div>
             </div>
 
-            <!-- Tab 4: 性能分析 (Phase 1 Barebones) -->
+            <!-- Tab 4: 性能分析 -->
             <div v-show="activeTab === 4"
                 style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 15px; background: #1a1a1a; display: flex; flex-direction: column; gap: 8px;">
                 <div style="flex-shrink: 0; padding-bottom: 10px; border-bottom: 1px solid #333;">
                     <h4 style="margin: 0 0 10px 0; color: #88c;">性能探测数据</h4>
                     <div style="display: flex; gap: 15px;">
                         <span
-                            style="font-family: monospace; font-size: calc(var(--base-font-size, 13px) + 1px); color: #4CAF50;">FPS:
+                            style="font-family: monospace; font-size: calc(var(--base-font-size, 13px) + 1px); color: #4CAF50;">帧率:
                             {{ globalState.profiler?.tick?.fps }}</span>
                         <span
-                            style="font-family: monospace; font-size: calc(var(--base-font-size, 13px) + 1px); color: #FF9800;">DrawCall:
+                            style="font-family: monospace; font-size: calc(var(--base-font-size, 13px) + 1px); color: #FF9800;">绘制调用:
                             {{ globalState.profiler?.tick?.drawCall }}</span>
                         <span
-                            style="font-family: monospace; font-size: calc(var(--base-font-size, 13px) + 1px); color: #2196F3;">Render:
+                            style="font-family: monospace; font-size: calc(var(--base-font-size, 13px) + 1px); color: #2196F3;">渲染耗时:
                             {{ globalState.profiler?.tick?.renderTime?.toFixed(2) }} ms</span>
                         <span
-                            style="font-family: monospace; font-size: calc(var(--base-font-size, 13px) + 1px); color: #9C27B0;">Logic:
+                            style="font-family: monospace; font-size: calc(var(--base-font-size, 13px) + 1px); color: #9C27B0;">逻辑耗时:
                             {{ globalState.profiler?.tick?.logicTime?.toFixed(2) }} ms</span>
                     </div>
                 </div>

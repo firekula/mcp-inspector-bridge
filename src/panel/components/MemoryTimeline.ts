@@ -206,8 +206,8 @@ export const MemoryTimeline = defineComponent({
             // 图例
             const legendY = 12;
             const legendItems = [
-                { color: '#2196f3', label: 'JS Heap Used' },
-                { color: '#9c27b0', label: 'JS Heap Total' },
+                { color: '#2196f3', label: 'JS堆已用' },
+                { color: '#9c27b0', label: 'JS堆总量' },
                 { color: '#ff9800', label: '资源内存' }
             ];
 
@@ -285,11 +285,11 @@ export const MemoryTimeline = defineComponent({
             <!-- 统计面板 -->
             <div class="memory-timeline-stats">
                 <div class="stat-item">
-                    <span class="stat-label">当前 JS Heap</span>
+                    <span class="stat-label">当前JS堆</span>
                     <span class="stat-value">{{ formatBytes(stats.currentJsHeapUsed) }}</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-label">JS Heap 上限</span>
+                    <span class="stat-label">JS堆上限</span>
                     <span class="stat-value">{{ formatBytes(stats.currentJsHeapTotal) }}</span>
                 </div>
                 <div class="stat-item">
@@ -297,7 +297,7 @@ export const MemoryTimeline = defineComponent({
                     <span class="stat-value">{{ formatBytes(stats.currentTotalMemory) }}</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-label">JS Heap 峰值</span>
+                    <span class="stat-label">JS堆峰值</span>
                     <span class="stat-value" style="color: #ff9800;">{{ formatBytes(stats.maxJsHeapUsed) }}</span>
                 </div>
                 <div class="stat-item">

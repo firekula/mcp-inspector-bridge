@@ -214,27 +214,27 @@ export const FrameTimeline = defineComponent({
         <div class="frame-timeline-wrap">
             <div class="frame-timeline-stats">
                 <div class="stat-item">
-                    <span class="stat-label">样本</span>
+                    <span class="stat-label">样本数</span>
                     <span class="stat-value">{{ stats.total }}</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-label">平均</span>
+                    <span class="stat-label">平均帧时间</span>
                     <span class="stat-value">{{ stats.avg }} ms</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-label">最低</span>
+                    <span class="stat-label">最快帧</span>
                     <span class="stat-value">{{ stats.min }} ms</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-label">最高</span>
+                    <span class="stat-label">最慢帧</span>
                     <span class="stat-value" :style="{ color: stats.max > 33 ? '#f44336' : '#4caf50' }">{{ stats.max }} ms</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-label">P95</span>
+                    <span class="stat-label">95分位</span>
                     <span class="stat-value">{{ stats.p95 }} ms</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-label">P99</span>
+                    <span class="stat-label">99分位</span>
                     <span class="stat-value">{{ stats.p99 }} ms</span>
                 </div>
                 <div class="stat-item">
