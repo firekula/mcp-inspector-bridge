@@ -563,15 +563,46 @@ export function initProfiler() {
                     assetType = assetInfo.type;
                     name = `${assetInfo.name}`;
                 } else {
-                    // 尝试获取着色器源码片段
+                    // 尝试从着色器源码中提取名称标识
                     try {
                         if (cachedGL && program) {
                             const attachedShaders = cachedGL.getAttachedShaders(program);
                             if (attachedShaders && attachedShaders.length > 0) {
                                 const source = cachedGL.getShaderSource(attachedShaders[0]);
                                 if (source) {
-                                    const lines = source.split('\n').slice(0, 2).join(' ');
-                                    name = `Shader #${info.id} [${lines.substring(0, 25)}...]`;
+                                    // 尝试提取 #define NAME 或注释中的名称
+                                    let shaderName = '';
+
+                                    // 查找 #define 定义（如 #define USE_TEXTURE）
+                                    const defineMatch = source.match(/#define\s+(\w+)/);
+                                    if (defineMatch) {
+                                        shaderName = defineMatch[1];
+                                    }
+
+                                    // 查找顶点/片元标识
+                                    if (!shaderName) {
+                                        if (source.indexOf('gl_Position') !== -1) {
+                                            shaderName = 'Vertex';
+                                        } else if (source.indexOf('gl_FragColor') !== -1 || source.indexOf('gl_FragData') !== -1) {
+                                            shaderName = 'Fragment';
+                                        }
+                                    }
+
+                                    // 查找 precision 声明判断类型
+                                    if (!shaderName) {
+                                        if (source.indexOf('attribute') !== -1) {
+                                            shaderName = 'Vertex';
+                                        } else if (source.indexOf('varying') !== -1 && source.indexOf('uniform') !== -1) {
+                                            shaderName = 'Fragment';
+                                        }
+                                    }
+
+                                    // 最终显示
+                                    if (shaderName) {
+                                        name = `${shaderName} Shader #${info.id}`;
+                                    } else {
+                                        name = `Shader #${info.id}`;
+                                    }
                                 }
                             }
                         }
