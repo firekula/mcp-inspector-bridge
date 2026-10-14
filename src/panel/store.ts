@@ -37,6 +37,21 @@ export const globalState = reactive({
             frameTimes: [] as number[],
             capacity: 600,
             lastUpdate: 0
+        },
+        memoryTimeline: {
+            history: [] as Array<{ time: number; jsHeapUsed: number; jsHeapTotal: number; totalMemory: number; nodeCount: number }>,
+            capacity: 150,
+            lastUpdate: 0
+        },
+        leakDetection: {
+            leakDetected: false,
+            confidence: 0,
+            trend: 'stable' as 'stable' | 'increasing' | 'decreasing' | 'insufficient_data',
+            slopeKBPerSample: 0,
+            rSquared: 0,
+            sampleCount: 0,
+            details: '',
+            lastCheck: 0
         }
     },
     renderDebugger: {

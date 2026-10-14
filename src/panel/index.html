@@ -683,6 +683,60 @@
         border-radius: 4px;
         border: 1px solid #333;
     }
+
+    /* 内存时间轴组件样式 */
+    .memory-timeline-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .leak-detection-panel {
+        background: #2a2a2a;
+        border: 2px solid #4caf50;
+        border-radius: 4px;
+        padding: 10px 12px;
+    }
+
+    .leak-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+    }
+
+    .leak-icon {
+        font-size: 16px;
+    }
+
+    .leak-text {
+        font-weight: bold;
+        font-size: calc(var(--base-font-size, 13px) + 1px);
+    }
+
+    .leak-details {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+
+    .leak-item {
+        font-family: 'Consolas', monospace;
+        font-size: calc(var(--base-font-size, 13px) - 1px);
+        color: #aaa;
+    }
+
+    .memory-timeline-stats {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+
+    .memory-timeline-canvas {
+        width: 100%;
+        border-radius: 4px;
+        border: 1px solid #333;
+    }
 </style>
 
 <div id="app" v-cloak>
@@ -1259,6 +1313,22 @@
                             :width="600"
                             :height="180">
                         </frame-timeline>
+                    </div>
+                </div>
+
+                <!-- 内存时间轴 -->
+                <div style="flex-shrink: 0; background: #222; border: 1px solid #333; border-radius: 4px; overflow: hidden;">
+                    <div
+                        style="background: #2a2a2a; padding: 6px 10px; font-weight: bold; font-size: calc(var(--base-font-size, 13px) - 1px); border-bottom: 1px solid #444; color: #e0e0e0;">
+                        内存时间轴与泄漏检测
+                    </div>
+                    <div style="padding: 10px;">
+                        <memory-timeline
+                            :memory-history="globalState.profiler.memoryTimeline.history"
+                            :leak-detection="globalState.profiler.leakDetection"
+                            :width="600"
+                            :height="200">
+                        </memory-timeline>
                     </div>
                 </div>
 

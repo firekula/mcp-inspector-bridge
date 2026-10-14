@@ -264,4 +264,142 @@ export function initProfiler() {
             capacity: FRAME_TIME_WINDOW
         };
     };
+
+    // ============ 内存时间轴与泄漏检测 ============
+
+    // 内存历史环形缓冲区（≈5 分钟 @2s 采样一次 = 150 样本）
+    const MEMORY_HISTORY_CAPACITY = 150;
+    const memoryHistory: Array<{ time: number; jsHeapUsed: number; jsHeapTotal: number; totalMemory: number; nodeCount: number }> = [];
+
+    // 泄漏检测基线：连续采样对比
+    let leakDetectionBaseline: any = null;
+    let leakDetectionSamples: Array<{ time: number; jsHeapUsed: number; totalMemory: number }> = [];
+    const LEAK_DETECTION_WINDOW = 30; // 30 个样本用于趋势分析
+
+    // 采样内存数据
+    function sampleMemory() {
+        const now = Date.now();
+        let jsHeapUsed = 0;
+        let jsHeapTotal = 0;
+
+        if (typeof performance !== 'undefined' && performance.memory) {
+            jsHeapUsed = performance.memory.usedJSHeapSize;
+            jsHeapTotal = performance.memory.totalJSHeapSize;
+        }
+
+        // 获取资源内存总量
+        let totalMemory = 0;
+        try {
+            const ccEng = getCcEngine();
+            if (ccEng && ccEng.assetManager && ccEng.assetManager.assets) {
+                ccEng.assetManager.assets.forEach((asset: any, uuid: string) => {
+                    if (!asset) return;
+                    // 简化计算：只计算纹理和音频等大资源
+                    if (asset._nativeAsset && asset._nativeAsset.byteLength) {
+                        totalMemory += asset._nativeAsset.byteLength;
+                    }
+                });
+            }
+        } catch (e) { }
+
+        const sample = {
+            time: now,
+            jsHeapUsed: jsHeapUsed,
+            jsHeapTotal: jsHeapTotal,
+            totalMemory: totalMemory,
+            nodeCount: 0
+        };
+
+        memoryHistory.push(sample);
+        if (memoryHistory.length > MEMORY_HISTORY_CAPACITY) {
+            memoryHistory.shift();
+        }
+
+        // 泄漏检测采样
+        leakDetectionSamples.push({ time: now, jsHeapUsed: jsHeapUsed, totalMemory: totalMemory });
+        if (leakDetectionSamples.length > LEAK_DETECTION_WINDOW) {
+            leakDetectionSamples.shift();
+        }
+
+        return sample;
+    }
+
+    // 内存历史数据接口
+    window.__mcpGetMemoryTimeline = function () {
+        return {
+            history: [...memoryHistory],
+            capacity: MEMORY_HISTORY_CAPACITY
+        };
+    };
+
+    // 泄漏检测接口：基于线性回归趋势分析
+    window.__mcpDetectMemoryLeak = function () {
+        if (leakDetectionSamples.length < 10) {
+            return { leakDetected: false, confidence: 0, trend: 'insufficient_data', details: '采样数据不足，至少需要 10 个样本' };
+        }
+
+        // 线性回归分析 jsHeapUsed 趋势
+        const n = leakDetectionSamples.length;
+        const xs = leakDetectionSamples.map((_, i) => i);
+        const ys = leakDetectionSamples.map(s => s.jsHeapUsed);
+
+        const sumX = xs.reduce((s, v) => s + v, 0);
+        const sumY = ys.reduce((s, v) => s + v, 0);
+        const sumXY = xs.reduce((s, x, i) => s + x * ys[i], 0);
+        const sumX2 = xs.reduce((s, v) => s + v * v, 0);
+
+        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+        const intercept = (sumY - slope * sumX) / n;
+
+        // 计算 R² 决定系数（拟合度）
+        const meanY = sumY / n;
+        const ssTotal = ys.reduce((s, v) => s + (v - meanY) * (v - meanY), 0);
+        const ssResidual = ys.reduce((s, y, i) => {
+            const predicted = slope * xs[i] + intercept;
+            return s + (y - predicted) * (y - predicted);
+        }, 0);
+        const rSquared = 1 - (ssResidual / ssTotal);
+
+        // 判断是否存在泄漏
+        // 条件：斜率持续为正（内存持续增长）且拟合度高
+        const slopeKB = slope / 1024; // 转换为 KB/样本
+        const isLeakDetected = slope > 1024 && rSquared > 0.7; // 斜率 > 1KB/样本 且 R² > 0.7
+
+        // 趋势分类
+        let trend = 'stable';
+        if (Math.abs(slopeKB) > 10) {
+            trend = slopeKB > 0 ? 'increasing' : 'decreasing';
+        }
+
+        // 预测未来内存使用
+        const futurePredictedMB = (slope * n * 30 + intercept) / 1024 / 1024; // 30 个样本后
+
+        return {
+            leakDetected: isLeakDetected,
+            confidence: Math.min(Math.max(rSquared, 0), 1),
+            trend: trend,
+            slopeKBPerSample: Math.round(slopeKB * 100) / 100,
+            rSquared: Math.round(rSquared * 1000) / 1000,
+            futurePredictedMB: Math.round(futurePredictedMB * 100) / 100,
+            sampleCount: n,
+            details: isLeakDetected
+                ? `检测到潜在内存泄漏：每采样周期增长 ${slopeKB.toFixed(2)} KB，趋势拟合度 ${(rSquared * 100).toFixed(1)}%`
+                : `内存趋势稳定，增长率 ${slopeKB.toFixed(2)} KB/样本`
+        };
+    };
+
+    // 手动设置泄漏检测基线
+    window.__mcpSetLeakBaseline = function () {
+        leakDetectionBaseline = sampleMemory();
+        leakDetectionSamples = []; // 重置采样窗口
+        return { success: true, baseline: leakDetectionBaseline };
+    };
+
+    // 定时采样内存数据（每 2 秒）
+    setInterval(() => {
+        sampleMemory();
+    }, 2000);
+
+    // 立即采样一次
+    sampleMemory();
 }
