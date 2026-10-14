@@ -156,6 +156,45 @@ export function initProfiler() {
                         }
                     }
                 }
+
+                // 关联材质/Effect（着色器来源）
+                const isMaterial = asset instanceof ccEng.Material ||
+                    (asset.constructor && asset.constructor.name === 'Material');
+
+                const isEffectAsset = asset instanceof ccEng.EffectAsset ||
+                    (asset.constructor && asset.constructor.name === 'EffectAsset');
+
+                if (isMaterial || isEffectAsset) {
+                    const name = asset.name || 'Unnamed';
+                    const type = isMaterial ? 'Material' : 'EffectAsset';
+                    try {
+                        // EffectAsset/Material 的结构：techniques -> passes -> program
+                        const effect = isMaterial ? (asset._effect || asset.effect) : asset;
+                        if (effect) {
+                            const techniques = effect._techniques || effect.techniques;
+                            if (techniques && Array.isArray(techniques)) {
+                                for (const technique of techniques) {
+                                    const passes = technique.passes || technique._passes;
+                                    if (passes && Array.isArray(passes)) {
+                                        for (const pass of passes) {
+                                            // pass 有 _programKey 标识着色器程序
+                                            const programKey = pass._programKey || pass.programKey;
+                                            if (programKey !== undefined && programKey !== null) {
+                                                shaderToAssetMap.set(programKey, {
+                                                    uuid: uuid,
+                                                    name: name,
+                                                    type: type
+                                                });
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        // 静默失败
+                    }
+                }
             });
 
             if (window.__MCP_DEBUG__) {
@@ -198,6 +237,20 @@ export function initProfiler() {
                 if (!info) {
                     info = { count: 0, lastUsed: 0, id: ++shaderIdCounter };
                     shaderSwitchDetails.set(program, info);
+
+                    // 尝试从 Cocos 渲染管线获取当前材质信息
+                    try {
+                        const ccEng = getCcEngine();
+                        if (ccEng && ccEng.renderer) {
+                            // Cocos 2.4 renderer 可能有 _currentMaterial 或类似属性
+                            const mat = ccEng.renderer._material ||
+                                       ccEng.renderer._currentMaterial ||
+                                       (ccEng.director && ccEng.director._scene);
+                            if (mat && mat._effect) {
+                                // 尝试关联
+                            }
+                        }
+                    } catch (e) { }
                 }
                 info.count++;
                 info.lastUsed = Date.now();
