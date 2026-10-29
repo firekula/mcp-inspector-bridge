@@ -3,7 +3,7 @@ declare const Editor: any;
 
 export const RenderDebugger = {
     template: `
-        <div style="padding: 10px; color: #eee; font-family: sans-serif; display: flex; flex-direction: column; height: 100%; box-sizing: border-box;">
+        <div style="padding: 0; color: #eee; font-family: sans-serif; display: flex; flex-direction: column; height: 100%; box-sizing: border-box;">
             <!-- 头部控制栏 -->
             <div style="flex-shrink: 0; margin-bottom: 5px; display: flex; align-items: flex-start; justify-content: flex-end; flex-wrap: wrap; gap: 10px;">
                 <div style="display: flex; gap: 10px; flex-wrap: wrap; flex: 1 1 auto; justify-content: flex-end;">
