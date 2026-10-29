@@ -645,6 +645,299 @@
         color: #fff;
         font-weight: bold;
     }
+
+    /* 帧时间波形图组件样式 */
+    .frame-timeline-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .frame-timeline-stats {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+
+    .stat-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+    }
+
+    .stat-label {
+        font-size: calc(var(--base-font-size, 13px) - 3px);
+        color: #888;
+    }
+
+    .stat-value {
+        font-family: 'Consolas', monospace;
+        font-size: calc(var(--base-font-size, 13px) - 1px);
+        font-weight: bold;
+        color: #e0e0e0;
+    }
+
+    .frame-timeline-canvas {
+        width: 100%;
+        border-radius: 4px;
+        border: 1px solid #333;
+    }
+
+    /* 内存时间轴组件样式 */
+    .memory-timeline-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .leak-detection-panel {
+        background: #2a2a2a;
+        border: 2px solid #4caf50;
+        border-radius: 4px;
+        padding: 10px 12px;
+    }
+
+    .leak-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+    }
+
+    .leak-icon {
+        font-size: 16px;
+    }
+
+    .leak-text {
+        font-weight: bold;
+        font-size: calc(var(--base-font-size, 13px) + 1px);
+    }
+
+    .leak-details {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+
+    .leak-item {
+        font-family: 'Consolas', monospace;
+        font-size: calc(var(--base-font-size, 13px) - 1px);
+        color: #aaa;
+    }
+
+    .memory-timeline-stats {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+
+    .memory-timeline-canvas {
+        width: 100%;
+        border-radius: 4px;
+        border: 1px solid #333;
+    }
+
+    /* 着色器与纹理绑定详情组件样式 */
+    .shader-texture-detail {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .detail-summary {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    .summary-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .summary-label {
+        font-size: calc(var(--base-font-size, 13px) - 2px);
+        color: #888;
+    }
+
+    .summary-value {
+        font-family: 'Consolas', monospace;
+        font-size: calc(var(--base-font-size, 13px) + 2px);
+        font-weight: bold;
+        color: #4caf50;
+    }
+
+    .summary-value.warn {
+        color: #ff9800;
+    }
+
+    .detail-tabs {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .detail-tab {
+        padding: 6px 14px;
+        background: #333;
+        border: 1px solid #444;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: calc(var(--base-font-size, 13px) - 1px);
+        color: #aaa;
+        transition: all 0.2s;
+    }
+
+    .detail-tab:hover {
+        background: #444;
+    }
+
+    .detail-tab.active {
+        background: #007acc;
+        border-color: #007acc;
+        color: #fff;
+    }
+
+    .detail-sort {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: calc(var(--base-font-size, 13px) - 1px);
+        color: #888;
+    }
+
+    .sort-select {
+        background: #333;
+        color: #ddd;
+        border: 1px solid #555;
+        border-radius: 3px;
+        padding: 3px 6px;
+        font-size: calc(var(--base-font-size, 13px) - 1px);
+    }
+
+    .detail-list {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .detail-table-wrap {
+        overflow-x: auto;
+    }
+
+    .detail-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: calc(var(--base-font-size, 13px) - 1px);
+    }
+
+    .detail-table thead {
+        position: sticky;
+        top: 0;
+        background: #2a2a2a;
+        z-index: 1;
+    }
+
+    .detail-table th {
+        padding: 6px 10px;
+        text-align: left;
+        color: #888;
+        border-bottom: 1px solid #444;
+    }
+
+    .detail-table td {
+        padding: 5px 10px;
+        border-bottom: 1px solid #2a2a2a;
+    }
+
+    .shader-id, .texture-id {
+        color: #9c27b0;
+        font-family: 'Consolas', monospace;
+    }
+
+    .size-text {
+        color: #2196f3;
+        font-family: 'Consolas', monospace;
+    }
+
+    .time-text {
+        color: #888;
+    }
+
+    .count-bar {
+        position: relative;
+        height: 18px;
+        background: #333;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .count-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #4caf50, #ff9800);
+        transition: width 0.3s;
+    }
+
+    .count-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-family: 'Consolas', monospace;
+        font-size: 11px;
+        color: #fff;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    .empty-row {
+        text-align: center;
+        color: #666;
+        padding: 20px !important;
+    }
+
+    .detail-hints {
+        background: #2a2a2a;
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 10px 14px;
+    }
+
+    .hint-title {
+        font-weight: bold;
+        color: #4caf50;
+        margin-bottom: 8px;
+        font-size: calc(var(--base-font-size, 13px) - 1px);
+    }
+
+    .hint-list {
+        margin: 0;
+        padding-left: 20px;
+        color: #aaa;
+        font-size: calc(var(--base-font-size, 13px) - 1px);
+        line-height: 1.8;
+    }
+
+    .locate-btn {
+        background: #2a72b8;
+        color: #fff;
+        border: none;
+        border-radius: 3px;
+        padding: 3px 8px;
+        cursor: pointer;
+        font-size: calc(var(--base-font-size, 13px) - 2px);
+        white-space: nowrap;
+        transition: background 0.2s;
+    }
+
+    .locate-btn:hover {
+        background: #3d8fd6;
+    }
+
+    .no-asset {
+        color: #555;
+    }
 </style>
 
 <div id="app" v-cloak>
@@ -749,43 +1042,72 @@
                        pointer-events: none; user-select: none;">
                 <!-- 帧率组 -->
                 <div>
-                    <span style="color:#888;">FPS</span>
+                    <span style="color:#888;">帧率</span>
                     <span :style="{color: statsFpsColor, fontWeight: 'bold', marginLeft: '6px'}">{{ globalState.profiler.tick.fps }}</span>
                 </div>
                 <div>
-                    <span style="color:#888;">Avg</span>
+                    <span style="color:#888;">平均</span>
                     <span :style="{color: statsAvgFpsColor, marginLeft: '6px'}">{{ globalState.profiler.tick.avgFps }}</span>
                 </div>
                 <div>
-                    <span style="color:#888;">1%Low</span>
+                    <span style="color:#888;">1%最低</span>
                     <span :style="{color: stats1pLowColor, marginLeft: '6px'}">{{ globalState.profiler.tick.fps1pLow }}</span>
                 </div>
                 <div>
-                    <span style="color:#888;">0.1%Low</span>
+                    <span style="color:#888;">0.1%最低</span>
                     <span :style="{color: stats01pLowColor, marginLeft: '6px'}">{{ globalState.profiler.tick.fps01pLow }}</span>
                 </div>
                 <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 2px 0;"></div>
                 <!-- 渲染组 -->
                 <div>
-                    <span style="color:#888;">DrawCall</span>
-                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.drawCall }}</span>
+                    <span style="color:#888;">绘制调用</span>
+                    <span :style="{color: statsDrawCallColor, marginLeft: '6px'}">{{ globalState.profiler.tick.drawCall }}</span>
                 </div>
                 <div>
-                    <span style="color:#888;">Logic</span>
-                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.logicTime }} ms</span>
+                    <span style="color:#888;">逻辑耗时</span>
+                    <span :style="{color: statsLogicTimeColor, marginLeft: '6px'}">{{ globalState.profiler.tick.logicTime }} ms</span>
                 </div>
                 <div>
-                    <span style="color:#888;">Render</span>
-                    <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.renderTime }} ms</span>
+                    <span style="color:#888;">渲染耗时</span>
+                    <span :style="{color: statsRenderTimeColor, marginLeft: '6px'}">{{ globalState.profiler.tick.renderTime }} ms</span>
                 </div>
                 <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 2px 0;"></div>
-                <!-- 资源组 -->
+                <!-- 管线组 -->
                 <div>
-                    <span style="color:#888;">Mem</span>
+                    <span style="color:#888;">着色器切换</span>
+                    <span :style="{color: statsShaderSwColor, marginLeft: '6px'}">{{ globalState.profiler.tick.shaderSwitches }}</span>
+                </div>
+                <div>
+                    <span style="color:#888;">纹理绑定</span>
+                    <span :style="{color: statsTexBindsColor, marginLeft: '6px'}">{{ globalState.profiler.tick.textureBinds }}</span>
+                </div>
+                <div>
+                    <span style="color:#888;">顶点数</span>
+                    <span :style="{color: statsVertsColor, marginLeft: '6px'}">{{ globalState.profiler.tick.vertices.toLocaleString() }}</span>
+                </div>
+                <div>
+                    <span style="color:#888;">三角面</span>
+                    <span :style="{color: statsTrisColor, marginLeft: '6px'}">{{ globalState.profiler.tick.triangles.toLocaleString() }}</span>
+                </div>
+                <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 2px 0;"></div>
+                <!-- 物理组 -->
+                <div>
+                    <span style="color:#888;">物理耗时</span>
+                    <span v-if="isPhysicsEnabled" :style="{color: statsPhysicsTimeColor, marginLeft: '6px'}">{{ globalState.profiler.tick.physicsTime }} ms</span>
+                    <span v-else style="color:#555; margin-left: 6px; font-style: italic;">未启用</span>
+                </div>
+                <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 2px 0;"></div>
+                <!-- 内存组 -->
+                <div>
+                    <span style="color:#888;">资源内存</span>
                     <span style="color:#e0e0e0; margin-left: 6px;">{{ formatBytes(globalState.profiler.tick.totalMemory) }}</span>
                 </div>
                 <div>
-                    <span style="color:#888;">Nodes</span>
+                    <span style="color:#888;">JS堆内存</span>
+                    <span :style="{color: statsJsHeapColor, marginLeft: '6px'}">{{ globalState.profiler.tick.jsHeapUsed }} / {{ globalState.profiler.tick.jsHeapTotal }} MB</span>
+                </div>
+                <div>
+                    <span style="color:#888;">节点数</span>
                     <span style="color:#e0e0e0; margin-left: 6px;">{{ globalState.profiler.tick.nodeCount.toLocaleString() }}</span>
                 </div>
             </div>
@@ -1156,24 +1478,69 @@
                 </div>
             </div>
 
-            <!-- Tab 4: 性能分析 (Phase 1 Barebones) -->
+            <!-- Tab 4: 性能分析 -->
             <div v-show="activeTab === 4"
-                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 15px; background: #1a1a1a; display: flex; flex-direction: column; gap: 8px;">
+                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 15px; background: #1a1a1a; display: flex; flex-direction: column; gap: 8px; overflow-y: auto;">
                 <div style="flex-shrink: 0; padding-bottom: 10px; border-bottom: 1px solid #333;">
                     <h4 style="margin: 0 0 10px 0; color: #88c;">性能探测数据</h4>
                     <div style="display: flex; gap: 15px;">
                         <span
-                            style="font-family: monospace; font-size: calc(var(--base-font-size, 13px) + 1px); color: #4CAF50;">FPS:
+                            style="font-family: monospace; font-size: calc(var(--base-font-size, 13px) + 1px); color: #4CAF50;">帧率:
                             {{ globalState.profiler?.tick?.fps }}</span>
                         <span
-                            style="font-family: monospace; font-size: calc(var(--base-font-size, 13px) + 1px); color: #FF9800;">DrawCall:
+                            style="font-family: monospace; font-size: calc(var(--base-font-size, 13px) + 1px); color: #FF9800;">绘制调用:
                             {{ globalState.profiler?.tick?.drawCall }}</span>
                         <span
-                            style="font-family: monospace; font-size: calc(var(--base-font-size, 13px) + 1px); color: #2196F3;">Render:
+                            style="font-family: monospace; font-size: calc(var(--base-font-size, 13px) + 1px); color: #2196F3;">渲染耗时:
                             {{ globalState.profiler?.tick?.renderTime?.toFixed(2) }} ms</span>
                         <span
-                            style="font-family: monospace; font-size: calc(var(--base-font-size, 13px) + 1px); color: #9C27B0;">Logic:
+                            style="font-family: monospace; font-size: calc(var(--base-font-size, 13px) + 1px); color: #9C27B0;">逻辑耗时:
                             {{ globalState.profiler?.tick?.logicTime?.toFixed(2) }} ms</span>
+                    </div>
+                </div>
+
+                <!-- 帧时间波形图 -->
+                <div style="flex-shrink: 0; background: #222; border: 1px solid #333; border-radius: 4px; overflow: hidden;">
+                    <div
+                        style="background: #2a2a2a; padding: 6px 10px; font-weight: bold; font-size: calc(var(--base-font-size, 13px) - 1px); border-bottom: 1px solid #444; color: #e0e0e0;">
+                        帧时间波形图
+                    </div>
+                    <div style="padding: 10px;">
+                        <frame-timeline
+                            :frame-times="globalState.profiler.frameTimeline.frameTimes"
+                            :width="600"
+                            :height="180">
+                        </frame-timeline>
+                    </div>
+                </div>
+
+                <!-- 内存时间轴 -->
+                <div style="flex-shrink: 0; background: #222; border: 1px solid #333; border-radius: 4px; overflow: hidden;">
+                    <div
+                        style="background: #2a2a2a; padding: 6px 10px; font-weight: bold; font-size: calc(var(--base-font-size, 13px) - 1px); border-bottom: 1px solid #444; color: #e0e0e0;">
+                        内存时间轴与泄漏检测
+                    </div>
+                    <div style="padding: 10px;">
+                        <memory-timeline
+                            :memory-history="globalState.profiler.memoryTimeline.history"
+                            :leak-detection="globalState.profiler.leakDetection"
+                            :width="600"
+                            :height="200">
+                        </memory-timeline>
+                    </div>
+                </div>
+
+                <!-- 着色器与纹理绑定详情 -->
+                <div style="flex-shrink: 0; background: #222; border: 1px solid #333; border-radius: 4px; overflow: hidden;">
+                    <div
+                        style="background: #2a2a2a; padding: 6px 10px; font-weight: bold; font-size: calc(var(--base-font-size, 13px) - 1px); border-bottom: 1px solid #444; color: #e0e0e0;">
+                        着色器与纹理绑定详情
+                    </div>
+                    <div style="padding: 10px;">
+                        <shader-texture-detail
+                            :details="globalState.profiler.shaderTextureDetails"
+                            @locate-asset="onLocateAsset">
+                        </shader-texture-detail>
                     </div>
                 </div>
 

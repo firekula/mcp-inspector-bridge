@@ -12,9 +12,55 @@ export const globalState = reactive({
     isNarrow: false as boolean,
     webviewSrc: '' as string,
     profiler: {
-        tick: { fps: 0, avgFps: 0, fps1pLow: 0, fps01pLow: 0, drawCall: 0, logicTime: 0, renderTime: 0, totalMemory: 0, nodeCount: 0 },
+        tick: {
+            fps: 0,
+            avgFps: 0,
+            fps1pLow: 0,
+            fps01pLow: 0,
+            drawCall: 0,
+            logicTime: 0,
+            renderTime: 0,
+            totalMemory: 0,
+            nodeCount: 0,
+            gpuTime: 0,
+            shaderSwitches: 0,
+            textureBinds: 0,
+            vertices: 0,
+            triangles: 0,
+            physicsTime: 0,
+            jsHeapUsed: 0,
+            jsHeapTotal: 0
+        },
         memoryStats: null as any,
-        expandedBundles: {} as any
+        expandedBundles: {} as any,
+        frameTimeline: {
+            frameTimes: [] as number[],
+            capacity: 600,
+            lastUpdate: 0
+        },
+        memoryTimeline: {
+            history: [] as Array<{ time: number; jsHeapUsed: number; jsHeapTotal: number; totalMemory: number; nodeCount: number }>,
+            capacity: 150,
+            lastUpdate: 0
+        },
+        leakDetection: {
+            leakDetected: false,
+            confidence: 0,
+            trend: 'stable' as 'stable' | 'increasing' | 'decreasing' | 'insufficient_data',
+            slopeKBPerSample: 0,
+            rSquared: 0,
+            sampleCount: 0,
+            details: '',
+            lastCheck: 0
+        },
+        shaderTextureDetails: {
+            shaderCount: 0,
+            textureCount: 0,
+            shaders: [] as Array<{ id: string, count: number, lastUsed: number }>,
+            textures: [] as Array<{ id: string, count: number, size: string, lastUsed: number }>,
+            summary: { totalShaderSwitches: 0, totalTextureBinds: 0 },
+            lastUpdate: 0
+        }
     },
     renderDebugger: {
         snapshots: [] as any[],

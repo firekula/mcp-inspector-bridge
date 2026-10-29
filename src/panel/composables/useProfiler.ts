@@ -5,6 +5,8 @@ export function useProfiler(globalState: any, gameView: any, activeTab: any) {
     let memoryRankTimer: any = null;
     let memoryTimer: any = null;
     let nodeCountTimer: any = null;
+    let frameTimelineTimer: any = null;
+    let memoryTimelineTimer: any = null;
 
     const startTickPolling = () => {
         if (tickTimer) return;
@@ -63,12 +65,87 @@ export function useProfiler(globalState: any, gameView: any, activeTab: any) {
                 } catch (e) {}
             }, 2000);
         }
+
+        // 帧时间历史轮询：500ms 间隔，更新帧时间波形图
+        if (!frameTimelineTimer) {
+            frameTimelineTimer = setInterval(() => {
+                const wvNow: any = gameView.value;
+                if (!wvNow || (typeof wvNow.isConnected === 'boolean' && !wvNow.isConnected)) return;
+                try { wvNow.getWebContentsId(); } catch (e) { return; }
+                try {
+                    wvNow.executeJavaScript(
+                        'window.__mcpGetFrameTimeline ? JSON.stringify(window.__mcpGetFrameTimeline()) : null'
+                    ).then((res: string) => {
+                        if (res) {
+                            try {
+                                const data = JSON.parse(res);
+                                globalState.profiler.frameTimeline.frameTimes = data.frameTimes || [];
+                                globalState.profiler.frameTimeline.capacity = data.capacity || 600;
+                                globalState.profiler.frameTimeline.lastUpdate = Date.now();
+                            } catch (e) {}
+                        }
+                    }).catch(() => {});
+                } catch (e) {}
+            }, 500);
+        }
+
+        // 内存时间轴轮询：2s 间隔，更新内存趋势图与泄漏检测
+        if (!memoryTimelineTimer) {
+            memoryTimelineTimer = setInterval(() => {
+                const wvNow: any = gameView.value;
+                if (!wvNow || (typeof wvNow.isConnected === 'boolean' && !wvNow.isConnected)) return;
+                try { wvNow.getWebContentsId(); } catch (e) { return; }
+                try {
+                    // 获取内存历史
+                    wvNow.executeJavaScript(
+                        'window.__mcpGetMemoryTimeline ? JSON.stringify(window.__mcpGetMemoryTimeline()) : null'
+                    ).then((res: string) => {
+                        if (res) {
+                            try {
+                                const data = JSON.parse(res);
+                                globalState.profiler.memoryTimeline.history = data.history || [];
+                                globalState.profiler.memoryTimeline.capacity = data.capacity || 150;
+                                globalState.profiler.memoryTimeline.lastUpdate = Date.now();
+                            } catch (e) {}
+                        }
+                    }).catch(() => {});
+
+                    // 获取泄漏检测结果
+                    wvNow.executeJavaScript(
+                        'window.__mcpDetectMemoryLeak ? JSON.stringify(window.__mcpDetectMemoryLeak()) : null'
+                    ).then((res: string) => {
+                        if (res) {
+                            try {
+                                const data = JSON.parse(res);
+                                Object.assign(globalState.profiler.leakDetection, data);
+                                globalState.profiler.leakDetection.lastCheck = Date.now();
+                            } catch (e) {}
+                        }
+                    }).catch(() => {});
+
+                    // 获取着色器/纹理详情
+                    wvNow.executeJavaScript(
+                        'window.__mcpGetShaderTextureDetails ? JSON.stringify(window.__mcpGetShaderTextureDetails()) : null'
+                    ).then((res: string) => {
+                        if (res) {
+                            try {
+                                const data = JSON.parse(res);
+                                Object.assign(globalState.profiler.shaderTextureDetails, data);
+                                globalState.profiler.shaderTextureDetails.lastUpdate = Date.now();
+                            } catch (e) {}
+                        }
+                    }).catch(() => {});
+                } catch (e) {}
+            }, 2000);
+        }
     };
 
     const stopTickPolling = () => {
         if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
         if (memoryTimer) { clearInterval(memoryTimer); memoryTimer = null; }
         if (nodeCountTimer) { clearInterval(nodeCountTimer); nodeCountTimer = null; }
+        if (frameTimelineTimer) { clearInterval(frameTimelineTimer); frameTimelineTimer = null; }
+        if (memoryTimelineTimer) { clearInterval(memoryTimelineTimer); memoryTimelineTimer = null; }
     };
 
     const setupProfilerWatchers = () => {

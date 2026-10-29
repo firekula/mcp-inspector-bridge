@@ -109,11 +109,48 @@ npm run build
 
 在游戏预览区左上角渲染半透明 Vue 性能数据面板，彻底解决引擎内置 `cc.debug.setDisplayStats()` 在高分辨率/移动端预览下完全无法辨认的问题：
 
-- **帧率全维度**: 瞬时 FPS、平均帧率 (Avg)、1% Low FPS、0.1% Low FPS，基于 600 帧环形缓冲区逐帧统计百分位
-- **渲染指标**: DrawCall、Logic 耗时、Render 耗时
-- **资源概况**: 实时内存占用 (Mem)、场景节点总数 (Nodes)
+- **帧率全维度**: 瞬时 FPS、平均帧率、1% Low、0.1% Low FPS，基于 600 帧环形缓冲区逐帧统计百分位
+- **渲染指标**: 绘制调用 (DrawCall)、逻辑耗时、渲染耗时
+- **管线指标**: 着色器切换次数、纹理绑定次数、顶点数、三角面数（基于 WebGL API Hook 精确统计，不依赖引擎暴露内部字段）
+- **物理耗时**: Hook `PhysicsManager.step()` 独立计量；未启用物理系统时以灰色「未启用」占位
+- **内存概况**: 资源内存占用、JS 堆已用/总量、场景节点总数
 - **智能轮询**: 性能数据 200ms、内存 1s、节点计数 2s 三档独立速率，节点 O(n) 遍历开销可控
-- **颜色自适应**: 各项指标根据预设阈值独立着色（绿/橙/红），低帧阈值逐级放宽
+- **全指标颜色分级**: 每项指标按预设阈值独立着色（绿/橙/红），阈值逐项调优（如逻辑耗时 <5ms 绿、<15ms 橙、≥15ms 红）
+
+### 📈 性能分析面板
+
+「💡 性能分析」标签页提供三个深度分析模块，整页支持垂直滚动：
+
+**帧时间波形图**
+
+- Canvas 2D 绘制 600 帧滑动窗口的帧时间曲线，60fps/30fps 参考线常驻
+- 卡顿帧（>33ms）红色圆点高亮，肉眼即可定位抖动位置
+- 统计栏实时给出样本数、平均帧时间、最快/最慢帧、95 分位、99 分位与卡顿帧计数
+- Y 轴自适应缩放，高分屏按 devicePixelRatio 渲染
+
+**内存时间轴与泄漏检测**
+
+- JS 堆已用/总量、资源内存三线并行绘制，150 样本环形缓冲（2s 采样，≈5 分钟历史）
+- 内置线性回归泄漏检测：输出增长斜率（KB/样本）、趋势方向与 R² 拟合度，斜率与拟合度双超阈值时告警
+- 汇总当前值、峰值与采样数，支持一键重置检测基线
+
+**着色器与纹理绑定详情**
+
+- 通过 Hook `gl.useProgram` / `gl.bindTexture` / `gl.drawArrays` / `gl.drawElements` 逐帧统计真实渲染状态切换
+- 分别列出高频着色器切换与纹理绑定明细（次数、纹理尺寸、最近使用时间），次数条形图横向对比
+- 纹理自动关联到 Cocos 资源（Texture2D / SpriteFrame），命中时显示资源名并提供 🎯 一键跳转资源管理器
+- 着色器名称从源码自动解析（识别 `#define` 标识、Vertex/Fragment 类型）
+- 内置优化提示：材质排序、图集合并、连续批次渲染等针对性建议
+
+### 🩺 MCP 性能诊断工具
+
+为大模型提供结构化性能数据与诊断工作流，支持自然语言性能问诊：
+
+- **`analyze_performance`**：一次性汇总帧率、渲染、内存、帧时间四维数据，自动生成健康度评估、瓶颈归因（逻辑 vs 渲染占比）与优先级排序的优化建议
+- **`get_frame_timeline`** / **`get_memory_timeline`**：导出帧时间与内存历史序列，供离线分析
+- **`get_memory_leak_report`**：返回泄漏趋势、增长率、拟合度与细节结论
+- **`reset_performance_baseline`**：重置性能基线，用于优化前后对比测量
+- **配套提示词**：`analyze_performance`、`diagnose_frame_drop`、`memory_leak_analysis`、`optimization_suggestions`，引导 LLM 按标准化流程逐步诊断
 
 ### ⏭️ 引擎控制
 
@@ -222,12 +259,15 @@ mcp-inspector-bridge/
 │   │       ├── NodeInspector.ts # 属性检查器
 │   │       ├── RenderDebugger.ts # 渲染调试器
 │   │       ├── ScriptManager.ts # 用户脚本管理器
+│   │       ├── FrameTimeline.ts # 帧时间波形图 (Canvas)
+│   │       ├── MemoryTimeline.ts # 内存时间轴与泄漏检测 (Canvas)
+│   │       ├── ShaderTextureDetail.ts # 着色器/纹理绑定详情与资源定位
 │   │       └── WidgetVisualizer.ts # Widget 可视化
 │   ├── mcp-client/            # MCP 原生客户端与服务层
 │   │   ├── index.ts           # MCP Stdio 服务器入口，处理多实例扫描与路由切换
-│   │   ├── tools.ts           # MCP 工具集定义 (ping, get_active_instances, etc.)
+│   │   ├── tools.ts           # MCP 工具集定义 (含 analyze_performance 等性能诊断工具)
 │   │   ├── resources.ts       # MCP 资源订阅定义 (scene://hierarchy)
-│   │   ├── prompts.ts         # MCP 提示词下发策略
+│   │   ├── prompts.ts         # MCP 提示词下发策略 (性能诊断工作流)
 │   │   └── configurator.ts    # 22+ 款主流 AI 客户端配置自动注入器
 │   └── probe/                 # 探针模块 (esbuild → dist/probe.js)
 │       ├── index.ts           # 探针主入口与生命周期
@@ -236,7 +276,7 @@ mcp-inspector-bridge/
 │       ├── engine-helper.ts   # 引擎实例查找器
 │       ├── highlighter.ts     # 高亮渲染层
 │       ├── picker.ts          # 屏幕拾取器
-│       ├── profiler.ts        # 帧率/耗时采集
+│       ├── profiler.ts        # 帧率/耗时/WebGL 渲染统计/内存历史采集
 │       ├── memory.ts          # 内存资源扫描
 │       ├── render-debugger.ts # 渲染管线劫持
 │       ├── console-hijacker.ts # 控制台劫持 (已废弃，日志由 CDP 接管)

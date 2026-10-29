@@ -7,6 +7,9 @@ const { NodeTree } = require('./components/NodeTree');
 const { NodeInspector } = require('./components/NodeInspector');
 const { RenderDebugger } = require('./components/RenderDebugger');
 const { ScriptManager } = require('./components/ScriptManager');
+const { FrameTimeline } = require('./components/FrameTimeline');
+const { MemoryTimeline } = require('./components/MemoryTimeline');
+const { ShaderTextureDetail } = require('./components/ShaderTextureDetail');
 const { useScriptSystem } = require('./composables/useScriptSystem');
 
 // 模块级引用，供 messages handlers 访问
@@ -45,7 +48,7 @@ module.exports = Editor.Panel.extend({
 
         try {
             const app = createApp({
-                components: { NodeTree, 'node-inspector': NodeInspector, 'render-debugger': RenderDebugger, 'script-manager': ScriptManager },
+                components: { NodeTree, 'node-inspector': NodeInspector, 'render-debugger': RenderDebugger, 'script-manager': ScriptManager, 'frame-timeline': FrameTimeline, 'memory-timeline': MemoryTimeline, 'shader-texture-detail': ShaderTextureDetail },
                 setup() {
                     const activeTab = ref(0);
                     const activeSettingSubTab = ref('appearance' as 'appearance' | 'network-mcp' | 'media-res' | 'logs-diag');
@@ -93,6 +96,87 @@ module.exports = Editor.Panel.extend({
                     const fps = globalState.profiler.tick.fps01pLow;
                     if (fps >= 20) return '#4caf50';
                     if (fps >= 10) return '#ff9800';
+                    return '#f44336';
+                });
+
+                // 绘制调用颜色：< 50 绿色，< 150 橙色，>= 150 红色
+                const statsDrawCallColor = computed(() => {
+                    const dc = globalState.profiler.tick.drawCall;
+                    if (dc < 50) return '#4caf50';
+                    if (dc < 150) return '#ff9800';
+                    return '#f44336';
+                });
+
+                // 逻辑耗时颜色：< 5ms 绿色，< 15ms 橙色，>= 15ms 红色
+                const statsLogicTimeColor = computed(() => {
+                    const t = globalState.profiler.tick.logicTime;
+                    if (t < 5) return '#4caf50';
+                    if (t < 15) return '#ff9800';
+                    return '#f44336';
+                });
+
+                // 渲染耗时颜色：< 5ms 绿色，< 15ms 橙色，>= 15ms 红色
+                const statsRenderTimeColor = computed(() => {
+                    const t = globalState.profiler.tick.renderTime;
+                    if (t < 5) return '#4caf50';
+                    if (t < 15) return '#ff9800';
+                    return '#f44336';
+                });
+
+                // 物理耗时颜色：< 2ms 绿色，< 8ms 橙色，>= 8ms 红色
+                const statsPhysicsTimeColor = computed(() => {
+                    const t = globalState.profiler.tick.physicsTime;
+                    if (t === 0) return '#666'; // 未启用
+                    if (t < 2) return '#4caf50';
+                    if (t < 8) return '#ff9800';
+                    return '#f44336';
+                });
+
+                // 是否启用了物理系统
+                const isPhysicsEnabled = computed(() => {
+                    return globalState.profiler.tick.physicsTime > 0;
+                });
+
+                // 着色器切换颜色：< 30 绿色，< 80 橙色，>= 80 红色
+                const statsShaderSwColor = computed(() => {
+                    const s = globalState.profiler.tick.shaderSwitches;
+                    if (s < 30) return '#4caf50';
+                    if (s < 80) return '#ff9800';
+                    return '#f44336';
+                });
+
+                // 纹理绑定颜色：< 50 绿色，< 120 橙色，>= 120 红色
+                const statsTexBindsColor = computed(() => {
+                    const t = globalState.profiler.tick.textureBinds;
+                    if (t < 50) return '#4caf50';
+                    if (t < 120) return '#ff9800';
+                    return '#f44336';
+                });
+
+                // 顶点数颜色：< 50000 绿色，< 150000 橙色，>= 150000 红色
+                const statsVertsColor = computed(() => {
+                    const v = globalState.profiler.tick.vertices;
+                    if (v < 50000) return '#4caf50';
+                    if (v < 150000) return '#ff9800';
+                    return '#f44336';
+                });
+
+                // 三角面颜色：< 30000 绿色，< 100000 橙色，>= 100000 红色
+                const statsTrisColor = computed(() => {
+                    const t = globalState.profiler.tick.triangles;
+                    if (t < 30000) return '#4caf50';
+                    if (t < 100000) return '#ff9800';
+                    return '#f44336';
+                });
+
+                // JS Heap 使用率颜色
+                const statsJsHeapColor = computed(() => {
+                    const used = globalState.profiler.tick.jsHeapUsed;
+                    const total = globalState.profiler.tick.jsHeapTotal;
+                    if (total === 0) return '#e0e0e0';
+                    const ratio = used / total;
+                    if (ratio < 0.5) return '#4caf50';
+                    if (ratio < 0.75) return '#ff9800';
                     return '#f44336';
                 });
 
@@ -851,6 +935,16 @@ mcp.log('脚本已加载');
                     statsAvgFpsColor,
                     stats1pLowColor,
                     stats01pLowColor,
+                    statsDrawCallColor,
+                    statsLogicTimeColor,
+                    statsRenderTimeColor,
+                    statsPhysicsTimeColor,
+                    isPhysicsEnabled,
+                    statsShaderSwColor,
+                    statsTexBindsColor,
+                    statsVertsColor,
+                    statsTrisColor,
+                    statsJsHeapColor,
                     isAtlasModalOpen,
                     atlasImages,
                     selectedAtlasIndex,
@@ -1104,12 +1198,94 @@ mcp.log('脚本已加载');
             if(!wv) { if (event.reply) event.reply(null, { error: 'No WebView' }); return; }
             if (typeof wv.isConnected === 'boolean' && !wv.isConnected) { if (event.reply) event.reply(null, { error: 'WebView detached from DOM' }); return; }
             try { wv.getWebContentsId(); } catch(e) { if (event.reply) event.reply(null, { error: 'WebView not ready' }); return; }
-            
+
             const code = `
                 (function(){
                     try {
                         if(typeof window.__mcpProfilerTick !== 'function') return JSON.stringify({ error: 'Profiler not injected' });
                         return JSON.stringify(window.__mcpProfilerTick());
+                    } catch(e) { return JSON.stringify({ error: 'EXECUTION_FAILED', msg: e.message }); }
+                })();
+            `;
+            wv.executeJavaScript(code)
+              .then((r:any) => { if(event.reply) event.reply(null, typeof r === 'string' ? JSON.parse(r) : r); })
+              .catch((e:any) => { if(event.reply) event.reply(null, { error: e.message }); });
+        },
+
+        // --- 性能分析工具 IPC 处理 (Phase 4) ---
+        'mcp-query-frame-timeline'(this: any, event: any, args: any) {
+            const wv: any = this.shadowRoot ? this.shadowRoot.querySelector('#game-view') : null;
+            if(!wv) { if (event.reply) event.reply(null, { error: 'No WebView' }); return; }
+            if (typeof wv.isConnected === 'boolean' && !wv.isConnected) { if (event.reply) event.reply(null, { error: 'WebView detached from DOM' }); return; }
+            try { wv.getWebContentsId(); } catch(e) { if (event.reply) event.reply(null, { error: 'WebView not ready' }); return; }
+
+            const limit = args?.limit || 600;
+            const code = `
+                (function(){
+                    try {
+                        if(typeof window.__mcpGetFrameTimeline !== 'function') return JSON.stringify({ error: 'FrameTimeline not injected' });
+                        var data = window.__mcpGetFrameTimeline();
+                        if (data.frameTimes && data.frameTimes.length > ${limit}) {
+                            data.frameTimes = data.frameTimes.slice(-${limit});
+                        }
+                        return JSON.stringify(data);
+                    } catch(e) { return JSON.stringify({ error: 'EXECUTION_FAILED', msg: e.message }); }
+                })();
+            `;
+            wv.executeJavaScript(code)
+              .then((r:any) => { if(event.reply) event.reply(null, typeof r === 'string' ? JSON.parse(r) : r); })
+              .catch((e:any) => { if(event.reply) event.reply(null, { error: e.message }); });
+        },
+
+        'mcp-query-memory-timeline'(this: any, event: any, args: any) {
+            const wv: any = this.shadowRoot ? this.shadowRoot.querySelector('#game-view') : null;
+            if(!wv) { if (event.reply) event.reply(null, { error: 'No WebView' }); return; }
+            if (typeof wv.isConnected === 'boolean' && !wv.isConnected) { if (event.reply) event.reply(null, { error: 'WebView detached from DOM' }); return; }
+            try { wv.getWebContentsId(); } catch(e) { if (event.reply) event.reply(null, { error: 'WebView not ready' }); return; }
+
+            const code = `
+                (function(){
+                    try {
+                        if(typeof window.__mcpGetMemoryTimeline !== 'function') return JSON.stringify({ error: 'MemoryTimeline not injected' });
+                        return JSON.stringify(window.__mcpGetMemoryTimeline());
+                    } catch(e) { return JSON.stringify({ error: 'EXECUTION_FAILED', msg: e.message }); }
+                })();
+            `;
+            wv.executeJavaScript(code)
+              .then((r:any) => { if(event.reply) event.reply(null, typeof r === 'string' ? JSON.parse(r) : r); })
+              .catch((e:any) => { if(event.reply) event.reply(null, { error: e.message }); });
+        },
+
+        'mcp-query-leak-report'(this: any, event: any, args: any) {
+            const wv: any = this.shadowRoot ? this.shadowRoot.querySelector('#game-view') : null;
+            if(!wv) { if (event.reply) event.reply(null, { error: 'No WebView' }); return; }
+            if (typeof wv.isConnected === 'boolean' && !wv.isConnected) { if (event.reply) event.reply(null, { error: 'WebView detached from DOM' }); return; }
+            try { wv.getWebContentsId(); } catch(e) { if (event.reply) event.reply(null, { error: 'WebView not ready' }); return; }
+
+            const code = `
+                (function(){
+                    try {
+                        if(typeof window.__mcpDetectMemoryLeak !== 'function') return JSON.stringify({ error: 'LeakDetection not injected' });
+                        return JSON.stringify(window.__mcpDetectMemoryLeak());
+                    } catch(e) { return JSON.stringify({ error: 'EXECUTION_FAILED', msg: e.message }); }
+                })();
+            `;
+            wv.executeJavaScript(code)
+              .then((r:any) => { if(event.reply) event.reply(null, typeof r === 'string' ? JSON.parse(r) : r); })
+              .catch((e:any) => { if(event.reply) event.reply(null, { error: e.message }); });
+        },
+
+        'mcp-reset-perf-baseline'(this: any, event: any, args: any) {
+            const wv: any = this.shadowRoot ? this.shadowRoot.querySelector('#game-view') : null;
+            if(!wv) { if (event.reply) event.reply(null, { error: 'No WebView' }); return; }
+            if (typeof wv.isConnected === 'boolean' && !wv.isConnected) { if (event.reply) event.reply(null, { error: 'WebView detached from DOM' }); return; }
+            try { wv.getWebContentsId(); } catch(e) { if (event.reply) event.reply(null, { error: 'WebView not ready' }); return; }
+
+            const code = `
+                (function(){
+                    try {
+                        if(typeof window.__mcpSetLeakBaseline !== 'function') return JSON.stringify({ error: 'Baseline API not injected' });
+                        return JSON.stringify(window.__mcpSetLeakBaseline());
                     } catch(e) { return JSON.stringify({ error: 'EXECUTION_FAILED', msg: e.message }); }
                 })();
             `;
