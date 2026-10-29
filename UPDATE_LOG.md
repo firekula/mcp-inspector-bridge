@@ -1,5 +1,23 @@
 # 更新日志 (Update Log)
 
+## [Unreleased] - 2026-10-29
+
+### ✨ 新特性与改进
+
+- **性能分析体系全面升级 (Performance Analysis Suite)**：
+  - **FPS 叠加框指标扩展**：新增着色器切换、纹理绑定、顶点数、三角面数、物理耗时、JS 堆内存等指标。渲染管线指标通过 Hook `gl.useProgram` / `gl.bindTexture` / `gl.drawArrays` / `gl.drawElements` 精确统计，绕开 Cocos 2.4 引擎未暴露 renderer 统计字段的限制。
+  - **全指标颜色分级**：帧率、绘制调用、逻辑/渲染/物理耗时、着色器切换、纹理绑定、顶点/三角面、JS 堆占用率均按各自阈值独立着色（绿/橙/红）；未启用物理系统时物理耗时以灰色「未启用」占位。
+  - **帧时间波形图**：新增 Canvas 2D 帧时间曲线（600 帧滑动窗口），含 60fps/30fps 参考线、卡顿帧高亮，并实时输出平均/最快/最慢/95 分位/99 分位/卡顿帧统计。
+  - **内存时间轴与泄漏检测**：JS 堆已用/总量与资源内存三线趋势图（150 样本环形缓冲），内置线性回归泄漏检测（增长斜率 + R² 拟合度双阈值告警）。
+  - **着色器与纹理绑定详情**：列出高频着色器切换与纹理绑定明细（次数、尺寸、最近使用时间）与横向占比条形图；纹理自动关联 Cocos 资源（Texture2D / SpriteFrame）并支持 🎯 一键跳转资源管理器；着色器名称从源码解析（`#define` 标识、Vertex/Fragment 类型）。
+  - **面板布局修复**：性能分析标签页支持垂直滚动，内容不再被容器裁切。
+
+- **MCP 性能诊断工具链 (MCP Performance Diagnostics)**：
+  - 新增工具 `analyze_performance`（四维性能汇总 + 瓶颈归因 + 优化建议）、`get_frame_timeline`、`get_memory_timeline`、`get_memory_leak_report`、`reset_performance_baseline`。
+  - 新增提示词 `analyze_performance`、`diagnose_frame_drop`、`memory_leak_analysis`、`optimization_suggestions`，为 LLM 提供标准化性能诊断流程，支持自然语言性能问诊与优化建议生成。
+
+---
+
 ## [Unreleased] - 2026-10-13
 
 ### 🐛 缺陷修复
