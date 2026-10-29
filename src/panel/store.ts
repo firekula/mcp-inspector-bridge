@@ -56,9 +56,9 @@ export const globalState = reactive({
         shaderTextureDetails: {
             shaderCount: 0,
             textureCount: 0,
-            shaders: [] as Array<{ id: string, count: number, lastUsed: number }>,
-            textures: [] as Array<{ id: string, count: number, size: string, lastUsed: number }>,
-            summary: { totalShaderSwitches: 0, totalTextureBinds: 0 },
+            shaders: [] as Array<{ id: string, count: number, perFrame: number, perSec: number, lastUsed: number }>,
+            textures: [] as Array<{ id: string, count: number, perFrame: number, perSec: number, size: string, lastUsed: number }>,
+            summary: { shaderPerFrame: 0, shaderPerSec: 0, texturePerFrame: 0, texturePerSec: 0 },
             lastUpdate: 0
         }
     },

@@ -44,15 +44,21 @@ export function initProfiler() {
     let frameTriangles = 0;
     let frameDrawCalls = 0;
 
-    // 着色器切换详情记录
-    const shaderSwitchDetails: Map<any, { count: number, lastUsed: number, id: number }> = new Map();
+    // 着色器切换详情记录（count 为累计值，frameCount 为当前统计区间内的次数）
+    const shaderSwitchDetails: Map<any, { count: number, lastUsed: number, id: number, frameCount: number, perFrame: number, perSec: number }> = new Map();
     // 纹理绑定详情记录
-    const textureBindDetails: Map<any, { count: number, lastUsed: number, size: string, id: number }> = new Map();
+    const textureBindDetails: Map<any, { count: number, lastUsed: number, size: string, id: number, frameCount: number, perFrame: number, perSec: number }> = new Map();
     // 自增 ID 计数器
     let shaderIdCounter = 0;
     let textureIdCounter = 0;
     // WebGL 上下文引用（用于查询信息）
     let cachedGL: any = null;
+
+    // 速率统计（每 500ms 结算一次）
+    let rateShaderPerFrame = 0;
+    let rateShaderPerSec = 0;
+    let rateTexturePerFrame = 0;
+    let rateTexturePerSec = 0;
 
     // 资源关联映射：WebGL 纹理对象 -> Cocos 资源信息
     const textureToAssetMap: Map<any, { uuid: string, name: string, type: string }> = new Map();
@@ -235,7 +241,7 @@ export function initProfiler() {
             if (program) {
                 let info = shaderSwitchDetails.get(program);
                 if (!info) {
-                    info = { count: 0, lastUsed: 0, id: ++shaderIdCounter };
+                    info = { count: 0, lastUsed: 0, id: ++shaderIdCounter, frameCount: 0, perFrame: 0, perSec: 0 };
                     shaderSwitchDetails.set(program, info);
 
                     // 尝试从 Cocos 渲染管线获取当前材质信息
@@ -253,6 +259,7 @@ export function initProfiler() {
                     } catch (e) { }
                 }
                 info.count++;
+                info.frameCount++;
                 info.lastUsed = Date.now();
             }
             return originalUseProgram(program);
@@ -306,7 +313,7 @@ export function initProfiler() {
 
                 let info = textureBindDetails.get(texture);
                 if (!info) {
-                    info = { count: 0, lastUsed: 0, size: '', id: texture.__mcpId };
+                    info = { count: 0, lastUsed: 0, size: '', id: texture.__mcpId, frameCount: 0, perFrame: 0, perSec: 0 };
                     textureBindDetails.set(texture, info);
                     // 调试：记录新纹理对象
                     if (window.__MCP_DEBUG__) {
@@ -315,6 +322,7 @@ export function initProfiler() {
                     }
                 }
                 info.count++;
+                info.frameCount++;
                 info.lastUsed = Date.now();
                 // 尝试获取纹理尺寸
                 try {
@@ -441,11 +449,32 @@ export function initProfiler() {
         displayLogicTime = logicFrames > 0 ? Number((accumulatedLogicTime / logicFrames).toFixed(2)) : 0;
         displayRenderTime = renderFrames > 0 ? Number((accumulatedRenderTime / renderFrames).toFixed(2)) : 0;
         displayGpuTime = gpuFrames > 0 ? Number((accumulatedGpuTime / gpuFrames).toFixed(2)) : 0;
-        displayShaderSwitches = Math.round(accumulatedShaderSwitches);
-        displayTextureBinds = Math.round(accumulatedTextureBinds);
         displayVertices = Math.round(accumulatedVertices / Math.max(renderFrames, 1));
         displayTriangles = Math.round(accumulatedTriangles / Math.max(renderFrames, 1));
         displayPhysicsTime = physicsFrames > 0 ? Number((accumulatedPhysicsTime / physicsFrames).toFixed(2)) : 0;
+
+        // 结算着色器/纹理速率（每帧 + 每秒），并清零区间计数
+        const framesInWindow = Math.max(renderFrames, 1);
+        const elapsedSec = dt > 0 ? dt : 0.5;
+        rateShaderPerFrame = Number((accumulatedShaderSwitches / framesInWindow).toFixed(1));
+        rateShaderPerSec = Math.round(accumulatedShaderSwitches / elapsedSec);
+        rateTexturePerFrame = Number((accumulatedTextureBinds / framesInWindow).toFixed(1));
+        rateTexturePerSec = Math.round(accumulatedTextureBinds / elapsedSec);
+
+        // 叠加框也展示每帧次数，与详情面板口径一致
+        displayShaderSwitches = rateShaderPerFrame;
+        displayTextureBinds = rateTexturePerFrame;
+
+        shaderSwitchDetails.forEach((info) => {
+            info.perFrame = Number((info.frameCount / framesInWindow).toFixed(2));
+            info.perSec = Math.round(info.frameCount / elapsedSec);
+            info.frameCount = 0;
+        });
+        textureBindDetails.forEach((info) => {
+            info.perFrame = Number((info.frameCount / framesInWindow).toFixed(2));
+            info.perSec = Math.round(info.frameCount / elapsedSec);
+            info.frameCount = 0;
+        });
 
         // JS Heap 内存 - 尝试多种方式
         if (typeof performance !== 'undefined') {
@@ -613,13 +642,15 @@ export function initProfiler() {
                     id: name,
                     rawId: info.id,
                     count: info.count,
+                    perFrame: info.perFrame,
+                    perSec: info.perSec,
                     lastUsed: info.lastUsed,
                     assetUuid: assetUuid,
                     assetName: assetName,
                     assetType: assetType
                 };
             })
-            .sort((a, b) => b.count - a.count)
+            .sort((a, b) => (b.perSec - a.perSec) || (b.count - a.count))
             .slice(0, 50);
 
         const textures = Array.from(textureBindDetails.entries())
@@ -644,6 +675,8 @@ export function initProfiler() {
                     id: name,
                     rawId: info.id,
                     count: info.count,
+                    perFrame: info.perFrame,
+                    perSec: info.perSec,
                     size: info.size,
                     lastUsed: info.lastUsed,
                     assetUuid: assetUuid,
@@ -651,7 +684,7 @@ export function initProfiler() {
                     assetType: assetType
                 };
             })
-            .sort((a, b) => b.count - a.count)
+            .sort((a, b) => (b.perSec - a.perSec) || (b.count - a.count))
             .slice(0, 50);
 
         // 调试输出匹配统计
@@ -665,8 +698,11 @@ export function initProfiler() {
             shaders,
             textures,
             summary: {
-                totalShaderSwitches: Array.from(shaderSwitchDetails.values()).reduce((s, v) => s + v.count, 0),
-                totalTextureBinds: Array.from(textureBindDetails.values()).reduce((s, v) => s + v.count, 0)
+                // 实时速率（每帧 / 每秒）
+                shaderPerFrame: rateShaderPerFrame,
+                shaderPerSec: rateShaderPerSec,
+                texturePerFrame: rateTexturePerFrame,
+                texturePerSec: rateTexturePerSec
             }
         };
     };

@@ -384,8 +384,8 @@ function generatePerformanceSummary(perfData: any): string {
         if (stats.gpuTime !== undefined) lines.push(`- GPU 耗时: ${stats.gpuTime} ms`);
         if (stats.vertices !== undefined) lines.push(`- 顶点数: ${stats.vertices.toLocaleString()}`);
         if (stats.triangles !== undefined) lines.push(`- 三角形数: ${stats.triangles.toLocaleString()}`);
-        if (stats.shaderSwitches !== undefined) lines.push(`- Shader 切换: ${stats.shaderSwitches}`);
-        if (stats.textureBinds !== undefined) lines.push(`- 纹理绑定: ${stats.textureBinds}`);
+        if (stats.shaderSwitches !== undefined) lines.push(`- 着色器切换(每帧): ${stats.shaderSwitches}`);
+        if (stats.textureBinds !== undefined) lines.push(`- 纹理绑定(每帧): ${stats.textureBinds}`);
 
         // 瓶颈判断
         if (stats.logicTime !== undefined && stats.renderTime !== undefined) {
@@ -480,8 +480,8 @@ function generateOptimizationSuggestions(perfData: any): string[] {
         }
 
         // Shader 切换频繁
-        if (stats.shaderSwitches > 50) {
-            suggestions.push(`💡 **Shader 切换频繁 (${stats.shaderSwitches})**: 尝试材质合并、排序渲染`);
+        if (stats.shaderSwitches > 30) {
+            suggestions.push(`💡 **着色器切换频繁 (${stats.shaderSwitches} 次/帧)**: 尝试材质合并、排序渲染`);
         }
 
         // 顶点数过多

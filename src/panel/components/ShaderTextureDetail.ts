@@ -24,20 +24,27 @@ export const ShaderTextureDetail = defineComponent({
         const { details } = toRefs(props);
 
         const activeTab = ref('shaders');
-        const sortBy = ref('count');
+        const sortBy = ref('perSec');
 
-        const sortedShaders = computed(() => {
-            const arr = details.value?.shaders || [];
+        const sortList = (arr: any[]) => {
             return [...arr].sort((a: any, b: any) => {
-                return sortBy.value === 'count' ? b.count - a.count : b.lastUsed - a.lastUsed;
+                if (sortBy.value === 'perSec') return (b.perSec || 0) - (a.perSec || 0) || (b.count || 0) - (a.count || 0);
+                if (sortBy.value === 'perFrame') return (b.perFrame || 0) - (a.perFrame || 0) || (b.count || 0) - (a.count || 0);
+                return (b.lastUsed || 0) - (a.lastUsed || 0);
             });
+        };
+
+        const sortedShaders = computed(() => sortList(details.value?.shaders || []));
+        const sortedTextures = computed(() => sortList(details.value?.textures || []));
+
+        // 条形图基准：当前列表中的最大每秒次数
+        const maxShaderPerSec = computed(() => {
+            const arr = (details.value?.shaders || []) as any[];
+            return Math.max(...arr.map((x: any) => x.perSec || 0), 1);
         });
-
-        const sortedTextures = computed(() => {
-            const arr = details.value?.textures || [];
-            return [...arr].sort((a: any, b: any) => {
-                return sortBy.value === 'count' ? b.count - a.count : b.lastUsed - a.lastUsed;
-            });
+        const maxTexturePerSec = computed(() => {
+            const arr = (details.value?.textures || []) as any[];
+            return Math.max(...arr.map((x: any) => x.perSec || 0), 1);
         });
 
         const formatTime = (timestamp: number) => {
@@ -61,29 +68,31 @@ export const ShaderTextureDetail = defineComponent({
             sortBy,
             sortedShaders,
             sortedTextures,
+            maxShaderPerSec,
+            maxTexturePerSec,
             formatTime,
             locateAsset
         };
     },
     template: `
         <div class="shader-texture-detail">
-            <!-- 汇总统计 -->
+            <!-- 汇总统计（实时速率） -->
             <div class="detail-summary">
                 <div class="summary-item">
                     <span class="summary-label">着色器数量</span>
                     <span class="summary-value">{{ details?.shaderCount || 0 }}</span>
                 </div>
                 <div class="summary-item">
-                    <span class="summary-label">着色器切换总数</span>
-                    <span class="summary-value warn">{{ details?.summary?.totalShaderSwitches || 0 }}</span>
+                    <span class="summary-label">着色器切换速率</span>
+                    <span class="summary-value warn">{{ details?.summary?.shaderPerFrame ?? 0 }} 次/帧 · {{ (details?.summary?.shaderPerSec ?? 0).toLocaleString() }} 次/秒</span>
                 </div>
                 <div class="summary-item">
                     <span class="summary-label">纹理数量</span>
                     <span class="summary-value">{{ details?.textureCount || 0 }}</span>
                 </div>
                 <div class="summary-item">
-                    <span class="summary-label">纹理绑定总数</span>
-                    <span class="summary-value warn">{{ details?.summary?.totalTextureBinds || 0 }}</span>
+                    <span class="summary-label">纹理绑定速率</span>
+                    <span class="summary-value warn">{{ details?.summary?.texturePerFrame ?? 0 }} 次/帧 · {{ (details?.summary?.texturePerSec ?? 0).toLocaleString() }} 次/秒</span>
                 </div>
             </div>
 
@@ -98,7 +107,8 @@ export const ShaderTextureDetail = defineComponent({
                 <div class="detail-sort">
                     <span>排序:</span>
                     <select v-model="sortBy" class="sort-select">
-                        <option value="count">按次数</option>
+                        <option value="perSec">按每秒次数</option>
+                        <option value="perFrame">按每帧次数</option>
                         <option value="lastUsed">按最近使用</option>
                     </select>
                 </div>
@@ -112,7 +122,7 @@ export const ShaderTextureDetail = defineComponent({
                         <thead>
                             <tr>
                                 <th>着色器标识</th>
-                                <th>切换次数 ⬇</th>
+                                <th>每帧 / 每秒 ⬇</th>
                                 <th>最近使用</th>
                                 <th>操作</th>
                             </tr>
@@ -122,8 +132,8 @@ export const ShaderTextureDetail = defineComponent({
                                 <td class="shader-id" :title="shader.id">{{ shader.id }}</td>
                                 <td>
                                     <div class="count-bar">
-                                        <div class="count-fill" :style="{ width: Math.min((shader.count / (sortedShaders[0]?.count || 1)) * 100, 100) + '%' }"></div>
-                                        <span class="count-text">{{ shader.count }}</span>
+                                        <div class="count-fill" :style="{ width: Math.min(((shader.perSec || 0) / maxShaderPerSec) * 100, 100) + '%' }"></div>
+                                        <span class="count-text">{{ shader.perFrame || 0 }} / {{ (shader.perSec || 0).toLocaleString() }}</span>
                                     </div>
                                 </td>
                                 <td class="time-text">{{ formatTime(shader.lastUsed) }}</td>
@@ -147,7 +157,7 @@ export const ShaderTextureDetail = defineComponent({
                             <tr>
                                 <th>纹理标识</th>
                                 <th>尺寸</th>
-                                <th>绑定次数 ⬇</th>
+                                <th>每帧 / 每秒 ⬇</th>
                                 <th>最近使用</th>
                                 <th>操作</th>
                             </tr>
@@ -158,8 +168,8 @@ export const ShaderTextureDetail = defineComponent({
                                 <td class="size-text">{{ texture.size || '-' }}</td>
                                 <td>
                                     <div class="count-bar">
-                                        <div class="count-fill" :style="{ width: Math.min((texture.count / (sortedTextures[0]?.count || 1)) * 100, 100) + '%' }"></div>
-                                        <span class="count-text">{{ texture.count }}</span>
+                                        <div class="count-fill" :style="{ width: Math.min(((texture.perSec || 0) / maxTexturePerSec) * 100, 100) + '%' }"></div>
+                                        <span class="count-text">{{ texture.perFrame || 0 }} / {{ (texture.perSec || 0).toLocaleString() }}</span>
                                     </div>
                                 </td>
                                 <td class="time-text">{{ formatTime(texture.lastUsed) }}</td>
