@@ -719,10 +719,17 @@ export function initProfiler() {
         let totalMemory = 0;
         try {
             const ccEng = getCcEngine();
-            if (ccEng && ccEng.assetManager && ccEng.assetManager.assets) {
+            // 优先复用内存排行的完整统计（与「资源内存排行」面板同源，避免口径不一致）
+            if (typeof window.__mcpGetMemoryRanking === 'function') {
+                const ranking = window.__mcpGetMemoryRanking();
+                if (ranking && typeof ranking.totalMemory === 'number') {
+                    totalMemory = ranking.totalMemory;
+                }
+            }
+            // 兜底：粗略累加原生资源字节数
+            if (totalMemory === 0 && ccEng && ccEng.assetManager && ccEng.assetManager.assets) {
                 ccEng.assetManager.assets.forEach((asset: any, uuid: string) => {
                     if (!asset) return;
-                    // 简化计算：只计算纹理和音频等大资源
                     if (asset._nativeAsset && asset._nativeAsset.byteLength) {
                         totalMemory += asset._nativeAsset.byteLength;
                     }

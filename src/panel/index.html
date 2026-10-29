@@ -1545,12 +1545,13 @@
                 </div>
 
                 <!-- 资源内存占用排行 -->
-                <div style="flex: 1; display: flex; gap: 10px; min-height: 0; overflow: hidden; margin-top: 5px;"
-                    :style="globalState.isNarrow ? { flexDirection: 'column' } : {}">
+                <div style="flex-shrink: 0; display: flex; gap: 10px; height: 460px; margin-top: 5px;"
+                    :style="globalState.isNarrow ? { flexDirection: 'column', height: 'auto' } : {}">
 
                     <!-- 左侧/上方：全局资源池排行 -->
                     <div
-                        style="flex: 1; display: flex; flex-direction: column; background: #222; border: 1px solid #333; border-radius: 4px; min-height: 0;">
+                        style="flex: 1; display: flex; flex-direction: column; background: #222; border: 1px solid #333; border-radius: 4px; min-height: 0;"
+                        :style="globalState.isNarrow ? { height: '360px' } : {}">
                         <div
                             style="background: #2a2a2a; padding: 6px 10px; font-weight: bold; font-size: calc(var(--base-font-size, 13px) - 1px); border-bottom: 1px solid #444; color: #e0e0e0; display: flex; justify-content: space-between; align-items: center;">
                             <span>资源内存排行</span>
@@ -1598,7 +1599,8 @@
 
                     <!-- 右侧/下方：按 Bundle 聚合排行 -->
                     <div
-                        style="flex: 1; display: flex; flex-direction: column; background: #222; border: 1px solid #333; border-radius: 4px; min-height: 0;">
+                        style="flex: 1; display: flex; flex-direction: column; background: #222; border: 1px solid #333; border-radius: 4px; min-height: 0;"
+                        :style="globalState.isNarrow ? { height: '360px' } : {}">
                         <div
                             style="background: #2a2a2a; padding: 6px 10px; font-weight: bold; font-size: calc(var(--base-font-size, 13px) - 1px); border-bottom: 1px solid #444; color: #e0e0e0;">
                             已激活 Bundle 层级排行
