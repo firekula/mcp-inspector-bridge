@@ -845,6 +845,7 @@
         text-align: left;
         color: #888;
         border-bottom: 1px solid #444;
+        white-space: nowrap;
     }
 
     .detail-table td {
@@ -855,6 +856,10 @@
     .shader-id, .texture-id {
         color: #9c27b0;
         font-family: 'Consolas', monospace;
+        max-width: 260px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .size-text {
@@ -869,6 +874,7 @@
     .count-bar {
         position: relative;
         height: 18px;
+        min-width: 84px;
         background: #333;
         border-radius: 3px;
         overflow: hidden;
@@ -885,6 +891,8 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
+        white-space: nowrap;
+        line-height: 1;
         font-family: 'Consolas', monospace;
         font-size: 11px;
         color: #fff;
