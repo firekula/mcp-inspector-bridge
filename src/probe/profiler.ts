@@ -1,7 +1,11 @@
 // @ts-nocheck
 import { getCcEngine } from './engine-helper';
+import { installMaskDiagnostics, restoreMaskDiagnostics } from './mask-diag';
 
 export function initProfiler() {
+    // 尽可能早地安装 getContext 捕获（探针先于引擎执行时，用它拿到引擎自己创建的上下文）
+    installContextCapture();
+
     let lastFrames = 0;
     let lastTime = Date.now();
     let currentFps = 0;
@@ -221,20 +225,76 @@ export function initProfiler() {
     // 立即构建一次
     setTimeout(buildAssetMapping, 1000);
 
-    function tryHookWebGL() {
-        if (isWebGLHooked) return;
+    // ===== WebGL 上下文获取策略：只复用引擎已创建的上下文，绝不主动创建 =====
+    // 背景：canvas.getContext 的上下文属性只在“第一次创建”时生效。若探针抢在引擎之前
+    // 用默认属性调用 getContext('webgl')，默认 stencil 为 false，引擎随后带
+    // { stencil: true } 拿到的仍是这份无模板缓冲的上下文（属性被忽略），
+    // 依赖模板测试的 cc.Mask 就会失效（子节点被整体裁掉 / 露出白色底）。
+    let glHookTarget: any = null;
+    let glHookBackup: any = null;
+    let glHooksDisabled = false;
+    let noContextWarned = false;
+    const probeStartTime = Date.now();
 
-        // 获取 WebGL 上下文（从 canvas）
-        const canvas = document.querySelector('canvas');
-        if (!canvas) return;
+    function installContextCapture() {
+        if (window.__mcpContextCaptureHooked) return;
+        window.__mcpContextCaptureHooked = true;
+        try {
+            const proto = HTMLCanvasElement.prototype;
+            const originalGetContext = proto.getContext;
+            proto.getContext = function (type: string, attrs: any) {
+                const ctx = originalGetContext.apply(this, arguments as any);
+                try {
+                    if (ctx && (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl')) {
+                        const ccEng = getCcEngine();
+                        const engineGL = ccEng && ccEng.game ? ccEng.game._renderContext : null;
+                        const isGameCanvas = this.id === 'GameCanvas' ||
+                            (ccEng && ccEng.game && ccEng.game.canvas === this);
+                        // 只记录落在游戏画布上的上下文，避免误拿离屏/特效画布的上下文
+                        if (isGameCanvas || !window.__mcpGLContext) {
+                            window.__mcpGLContext = ctx;
+                            window.__mcpGLContextInfo = {
+                                type: type,
+                                attrs: attrs || null,
+                                actual: typeof ctx.getContextAttributes === 'function' ? ctx.getContextAttributes() : null,
+                                canvasId: this.id || '',
+                                canvasSize: this.width + 'x' + this.height,
+                                createdAt: Date.now(),
+                                engineContextAssignedAtCapture: !!(engineGL && engineGL === ctx),
+                                isGameCanvas: !!isGameCanvas,
+                            };
+                        }
+                        if (typeof window.__mcpOnGLContextReady === 'function') {
+                            try { window.__mcpOnGLContextReady(ctx); } catch (e) { }
+                        }
+                    }
+                } catch (e) { }
+                return ctx;
+            };
+        } catch (e) { }
+    }
 
-        const gl = canvas.getContext('webgl') || canvas.getContext('webgl2');
-        if (!gl) return;
+    function resolveExistingGL() {
+        // 1) Cocos 2.4 引擎自己缓存的上下文（最可靠：属性一定是引擎申请的那一份）
+        try {
+            const ccEng = getCcEngine();
+            if (ccEng && ccEng.game && ccEng.game._renderContext) {
+                return { gl: ccEng.game._renderContext, source: 'cc.game._renderContext' };
+            }
+        } catch (e) { }
+        // 2) 引擎调用 getContext 时被捕获的上下文（探针先于引擎执行的场景）
+        if (window.__mcpGLContext) {
+            return { gl: window.__mcpGLContext, source: 'getContext-capture' };
+        }
+        // 3) 绝不 fallback 到 canvas.getContext()：宁可暂不统计，也不能抢跑创建上下文
+        return null;
+    }
 
-        isWebGLHooked = true;
-        cachedGL = gl;
+    function installGLHooks(gl: any) {
+        const backup: any = {};
 
         // Hook useProgram - Shader 切换
+        backup.useProgram = gl.useProgram;
         const originalUseProgram = gl.useProgram.bind(gl);
         gl.useProgram = function (program: any) {
             frameShaderSwitches++;
@@ -266,6 +326,7 @@ export function initProfiler() {
         };
 
         // Hook createTexture - 追踪纹理创建
+        backup.createTexture = gl.createTexture;
         const originalCreateTexture = gl.createTexture.bind(gl);
         gl.createTexture = function () {
             const texture = originalCreateTexture();
@@ -279,6 +340,7 @@ export function initProfiler() {
         };
 
         // Hook texImage2D - 纹理上传时建立资源关联
+        backup.texImage2D = gl.texImage2D;
         const originalTexImage2D = gl.texImage2D.bind(gl);
         gl.texImage2D = function (...args: any[]) {
             // 当前绑定的纹理
@@ -302,6 +364,7 @@ export function initProfiler() {
         };
 
         // Hook bindTexture - 纹理绑定
+        backup.bindTexture = gl.bindTexture;
         const originalBindTexture = gl.bindTexture.bind(gl);
         gl.bindTexture = function (target: number, texture: any) {
             if (texture) {
@@ -324,7 +387,7 @@ export function initProfiler() {
                 info.count++;
                 info.frameCount++;
                 info.lastUsed = Date.now();
-                // 尝试获取纹理尺寸
+                // 尝试获取纹理尺寸（WebGL1 没有 getTexLevelParameter，会直接抛错并被忽略）
                 try {
                     const level = 0;
                     const width = gl.getTexLevelParameter(target, level, gl.TEXTURE_WIDTH);
@@ -336,6 +399,7 @@ export function initProfiler() {
         };
 
         // Hook drawArrays - 统计顶点和三角形
+        backup.drawArrays = gl.drawArrays;
         const originalDrawArrays = gl.drawArrays.bind(gl);
         gl.drawArrays = function (mode: number, first: number, count: number) {
             frameDrawCalls++;
@@ -346,6 +410,7 @@ export function initProfiler() {
         };
 
         // Hook drawElements - 统计顶点和三角形
+        backup.drawElements = gl.drawElements;
         const originalDrawElements = gl.drawElements.bind(gl);
         gl.drawElements = function (mode: number, count: number, type: number, offset: number) {
             frameDrawCalls++;
@@ -353,6 +418,67 @@ export function initProfiler() {
             if (mode === gl.TRIANGLES) frameTriangles += count / 3;
             else if (mode === gl.TRIANGLE_STRIP || mode === gl.TRIANGLE_FAN) frameTriangles += Math.max(0, count - 2);
             return originalDrawElements(mode, count, type, offset);
+        };
+
+        glHookBackup = backup;
+        glHookTarget = gl;
+    }
+
+    function tryHookWebGL() {
+        if (isWebGLHooked || glHooksDisabled) return;
+
+        const resolved = resolveExistingGL();
+        if (!resolved) {
+            if (!noContextWarned && Date.now() - probeStartTime > 5000) {
+                noContextWarned = true;
+                console.warn('[Profiler] 暂未获取到引擎 WebGL 上下文，性能统计等待引擎初始化（探针不会主动创建上下文，以免破坏 cc.Mask 的模板缓冲）');
+            }
+            return;
+        }
+
+        isWebGLHooked = true;
+        cachedGL = resolved.gl;
+        window.__mcpGLContextSource = resolved.source;
+        installGLHooks(resolved.gl);
+        // 遮罩诊断：只读旁路记录 stencil 调用，用于定位 Mask 异常
+        try { installMaskDiagnostics(resolved.gl); } catch (e) { }
+
+        const ctxAttrs = (() => {
+            try { return resolved.gl.getContextAttributes ? resolved.gl.getContextAttributes() : null; } catch (e) { return null; }
+        })();
+        console.warn(`[Profiler] WebGL Hook 已挂载 | 上下文来源: ${resolved.source} | stencil=${ctxAttrs ? ctxAttrs.stencil : '?'} | alpha=${ctxAttrs ? ctxAttrs.alpha : '?'} | premultipliedAlpha=${ctxAttrs ? ctxAttrs.premultipliedAlpha : '?'}`);
+
+        window.__mcpGLHookStatus = function () {
+            return {
+                hooked: !!glHookTarget && !glHooksDisabled,
+                disabledByUser: glHooksDisabled,
+                contextSource: resolved.source,
+                contextIsEngineContext: (() => {
+                    try {
+                        const cc = getCcEngine();
+                        return !!(cc && cc.game && cc.game._renderContext === resolved.gl);
+                    } catch (e) { return false; }
+                })(),
+                contextInfo: window.__mcpGLContextInfo || null,
+                contextAttributes: ctxAttrs,
+                stencilBits: (() => { try { return resolved.gl.getParameter(resolved.gl.STENCIL_BITS); } catch (e) { return null; } })(),
+            };
+        };
+
+        // A/B 排查开关：还原全部 WebGL Hook，用于确认遮罩问题是否由本插件的 GL 包装引起
+        window.__mcpDisableGLHooks = function () {
+            if (!glHookTarget || !glHookBackup) {
+                console.warn('[Profiler] 当前没有可还原的 WebGL Hook');
+                return false;
+            }
+            Object.keys(glHookBackup).forEach((name) => {
+                try { glHookTarget[name] = glHookBackup[name]; } catch (e) { }
+            });
+            try { restoreMaskDiagnostics(); } catch (e) { }
+            glHooksDisabled = true;
+            isWebGLHooked = true; // 阻止 500ms 轮询重新挂载
+            console.warn('[Profiler] 已还原全部 WebGL Hook（A/B 排查模式）。若此时遮罩立即恢复，说明问题出在 WebGL 包装层；刷新页面即可恢复性能统计。');
+            return true;
         };
     }
 

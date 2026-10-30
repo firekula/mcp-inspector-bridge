@@ -1,5 +1,22 @@
 # 更新日志 (Update Log)
 
+## [Unreleased] - 2026-10-30
+
+### 🐛 缺陷修复
+
+- **修复部分项目 cc.Mask 遮罩子节点整体消失 / 露出白底 (Fix Mask Broken by Early WebGL Context Creation)**
+  **问题**：探针在 `DOMContentLoaded` 阶段执行性能统计初始化时，会直接调用 `canvas.getContext('webgl')`。WebGL 上下文属性只在「首次创建」时生效，此时默认 `stencil: false`；引擎随后在 `window.onload` 中带 `{ stencil: true }` 调用 `getContext` 只能取回这份已存在的上下文，属性被忽略。`cc.Mask` 完全依赖模板测试，模板缓冲缺失后遮罩写入失效、子节点被整体裁掉，露出父级白色底（普通浏览器预览没有探针注入，因此正常）。
+  **方案**：探针不再主动创建 WebGL 上下文，改为只复用引擎已创建的上下文（`cc.game._renderContext`），或在探针早于引擎执行时通过 `HTMLCanvasElement.prototype.getContext` 旁路捕获引擎自己创建的那一份上下文；等待超过 5 秒仍无上下文时仅打印提示，不降级创建。顺带补充了上下文属性（stencil/alpha/premultipliedAlpha）与来源日志。
+
+### 🔍 诊断能力
+
+- **新增遮罩诊断模块 (Mask Diagnostics)**：对 `cc.Mask` 的模板缓冲链路做只读旁路观测，不修改任何渲染状态。
+  - 启动后自动上报一次诊断摘要与异常告警：上下文真实属性、`STENCIL_BITS`、上下文来源、每帧 stencil 调用次数、场景内全部 Mask 的类型（RECT/ELLIPSE/IMAGE_STENCIL）、inverted、alphaThreshold、嵌套层数、材质完整性、IMAGE_STENCIL 贴图与材质是否一致、Mask 是否与渲染组件同节点、相机分组可见性等。
+  - 自动告警覆盖：上下文 `stencil=false` / `STENCIL_BITS=0` / 非 WebGL 渲染模式 / 有 Mask 但整帧无 stencil 调用 / 疑似写入位与测试位不匹配 / Mask 材质缺失（Error 9000 类）/ IMAGE_STENCIL 无贴图或贴图未加载。
+  - 游戏 DevTools 控制台可执行 `__mcpMaskDiag()` 取完整报告，`__mcpGLHookStatus()` 查看 Hook 状态，`__mcpDisableGLHooks()` 一键还原全部 WebGL Hook 用于 A/B 排查（若还原后遮罩立即恢复，即可确认问题出在 WebGL 包装层）。
+
+---
+
 ## [Unreleased] - 2026-10-29
 
 ### ✨ 新特性与改进
