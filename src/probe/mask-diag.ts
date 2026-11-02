@@ -18,6 +18,7 @@
  */
 
 import { getCcEngine } from './engine-helper';
+import { Logger } from './logger';
 
 const FRAME_TRACE_LIMIT = 240;
 
@@ -66,11 +67,7 @@ interface DiagState {
     framesWithOps: number;
     traces: any[];
     lastFrameTraces: any[];
-    lastWarnSignature: string;
-    lastReportAt: number;
     directorBound: boolean;
-    firstMasksSeenAt: number;
-    warnedNoStencil: boolean;
 }
 
 const state: DiagState = {
@@ -86,11 +83,7 @@ const state: DiagState = {
     framesWithOps: 0,
     traces: [],
     lastFrameTraces: [],
-    lastWarnSignature: '',
-    lastReportAt: 0,
     directorBound: false,
-    firstMasksSeenAt: 0,
-    warnedNoStencil: false,
 };
 
 function safe(fn: any, fallback: any = null) {
@@ -210,7 +203,7 @@ export function installMaskDiagnostics(gl: any, source?: string) {
     state.backup = backup;
     try {
         window.__mcpGLStencilRecorder = { state, backup };
-        console.warn('[McpMaskDiag] stencil 旁路记录器已挂载（只读透传，不改渲染状态）');
+        Logger.log('[McpMaskDiag] stencil 旁路记录器已挂载（只读透传，不改渲染状态）');
     } catch (e) { }
 }
 
@@ -223,7 +216,7 @@ export function restoreMaskDiagnostics() {
     });
     state.backup = null;
     state.hooked = false;
-    console.warn('[McpMaskDiag] stencil 旁路记录器已还原');
+    Logger.log('[McpMaskDiag] stencil 旁路记录器已还原');
     return true;
 }
 
@@ -557,8 +550,6 @@ export function collectMaskReport() {
         }
     });
 
-    if (masks.length && !state.firstMasksSeenAt) state.firstMasksSeenAt = Date.now();
-
     return {
         generatedAt: new Date().toISOString(),
         engine: {
@@ -638,61 +629,23 @@ export function formatMaskReport(report: any) {
     return lines.join('\n');
 }
 
-function emitReport(report: any) {
-    const text = formatMaskReport(report);
-    try {
-        // 完整报告写控制台（DevTools 可见完整内容；面板日志缓冲会截断到 300 字，故同时压缩输出摘要）
-        console.warn('[McpMaskDiag]\n' + text);
-        console.warn('[McpMaskDiag] 摘要: ' + JSON.stringify({
-            engine: report.engine.version,
-            renderType: report.engine.renderType,
-            stencilAttr: report.context.attributes && report.context.attributes.stencil,
-            stencilBits: report.context.stencilBits,
-            contextSource: report.context.probeSource,
-            masks: report.masks.length,
-            maskTypes: report.masks.map((m: any) => m.type),
-            stencilOpsLastFrame: report.stencil.opsLastFrame,
-            warnings: report.warnings.length,
-        }));
-        report.warnings.forEach((w: string) => console.warn('[McpMaskDiag] ⚠ ' + w));
-        console.warn('[McpMaskDiag] 如需复现时抓取现场：在游戏 DevTools 控制台执行 __mcpMaskDiag()；' +
-            '若怀疑是本插件 WebGL 统计 Hook 引起，执行 __mcpDisableGLHooks() 后观察遮罩是否立即恢复。');
-    } catch (e) { }
-    state.lastReportAt = Date.now();
-    return report;
-}
-
 /**
- * 初始化：安装上下文捕获、事件绑定与自动上报。
+ * 初始化：只做静默准备（绑定帧事件 + 挂载 stencil 旁路记录器），默认不向控制台输出任何日志。
+ * 诊断报告仅在显式调用 __mcpMaskDiag() 时输出。
  * 注意：绝不主动调用 canvas.getContext()，避免抢在引擎之前用默认属性（stencil:false）创建上下文。
  */
 export function initMaskDiagnostics() {
     safe(() => getStore());
-    // 定期尝试绑定 director 事件 + GL 上下文
+    // 静默轮询：绑定 director 帧事件 + 挂载只读 stencil 记录器
     const timer = setInterval(() => {
         safe(() => bindDirectorFrames());
         const eng = getEngine();
-        if (eng && eng.director) {
-            if (!state.gl) {
-                const gl = safe(() => (window.__mcpGLContext || (eng.game && eng.game._renderContext)), null);
-                if (gl) installMaskDiagnostics(gl);
-            }
-            if (state.directorBound && state.frames > 5) {
-                const masks = safe(() => collectMasks(), []);
-                if (masks.length) {
-                    const report = collectMaskReport();
-                    const signature = report.warnings.join('||');
-                    const isFirst = state.lastWarnSignature === '';
-                    const changed = signature !== state.lastWarnSignature;
-                    if (isFirst || (changed && Date.now() - state.lastReportAt > 5000)) {
-                        state.lastWarnSignature = signature;
-                        emitReport(report);
-                    }
-                }
-            }
+        if (eng && eng.director && !state.gl) {
+            const gl = safe(() => (window.__mcpGLContext || (eng.game && eng.game._renderContext)), null);
+            if (gl) installMaskDiagnostics(gl);
         }
     }, 1000);
-    // 30 秒后停止主动轮询，但保留手动接口
+    // 30 秒后停止主动轮询（已挂载的记录器与手动接口继续可用）
     setTimeout(() => {
         try { clearInterval(timer); } catch (e) { }
     }, 30000);
@@ -701,18 +654,17 @@ export function initMaskDiagnostics() {
         window.__mcpMaskDiag = function (print = true) {
             const report = collectMaskReport();
             if (print) {
-                try { console.warn('[McpMaskDiag]\n' + formatMaskReport(report)); } catch (e) { }
+                try { console.log('[McpMaskDiag]\n' + formatMaskReport(report)); } catch (e) { }
             }
             return JSON.stringify(report);
         };
         window.__mcpMaskDiagRestore = restoreMaskDiagnostics;
         window.__mcpMaskDiagHelp = function () {
-            console.warn('[McpMaskDiag] 可用命令：\n' +
+            console.log('[McpMaskDiag] 可用命令：\n' +
                 '  __mcpMaskDiag()        - 打印并返回完整遮罩诊断报告(JSON)\n' +
                 '  __mcpDisableGLHooks()  - 还原本插件全部 WebGL Hook（A/B 排查）\n' +
                 '  __mcpGLHookStatus()    - 查看 Hook 状态\n' +
                 '  __mcpMaskDiagRestore() - 仅还原 stencil 旁路记录器');
         };
-        console.warn('[McpMaskDiag] 遮罩诊断已启用，可随时执行 __mcpMaskDiag() 获取报告。');
     });
 }

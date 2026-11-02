@@ -431,7 +431,9 @@ export function initProfiler() {
         if (!resolved) {
             if (!noContextWarned && Date.now() - probeStartTime > 5000) {
                 noContextWarned = true;
-                console.warn('[Profiler] 暂未获取到引擎 WebGL 上下文，性能统计等待引擎初始化（探针不会主动创建上下文，以免破坏 cc.Mask 的模板缓冲）');
+                if (window.__MCP_DEBUG__) {
+                    console.log('[Profiler] 暂未获取到引擎 WebGL 上下文，性能统计等待引擎初始化（探针不会主动创建上下文，以免破坏 cc.Mask 的模板缓冲）');
+                }
             }
             return;
         }
@@ -446,7 +448,9 @@ export function initProfiler() {
         const ctxAttrs = (() => {
             try { return resolved.gl.getContextAttributes ? resolved.gl.getContextAttributes() : null; } catch (e) { return null; }
         })();
-        console.warn(`[Profiler] WebGL Hook 已挂载 | 上下文来源: ${resolved.source} | stencil=${ctxAttrs ? ctxAttrs.stencil : '?'} | alpha=${ctxAttrs ? ctxAttrs.alpha : '?'} | premultipliedAlpha=${ctxAttrs ? ctxAttrs.premultipliedAlpha : '?'}`);
+        if (window.__MCP_DEBUG__) {
+            console.log(`[Profiler] WebGL Hook 已挂载 | 上下文来源: ${resolved.source} | stencil=${ctxAttrs ? ctxAttrs.stencil : '?'} | alpha=${ctxAttrs ? ctxAttrs.alpha : '?'} | premultipliedAlpha=${ctxAttrs ? ctxAttrs.premultipliedAlpha : '?'}`);
+        }
 
         window.__mcpGLHookStatus = function () {
             return {

@@ -1,18 +1,28 @@
 # 更新日志 (Update Log)
 
+## [Unreleased] - 2026-11-02
+
+### 🔧 调试日志收敛
+
+- **遮罩诊断改为按需触发 (Silence Mask Diagnostics by Default)**：测试验证通过后，移除探针启动时的自动上报与全部 `[McpMaskDiag]` 自动日志，恢复「控制台零噪音」约定。诊断能力保留，仅在手动执行 `__mcpMaskDiag()` / `__mcpMaskDiagHelp()` 时输出；`__mcpGLHookStatus()`、`__mcpDisableGLHooks()` 仍可用于 A/B 排查。
+- **WebGL Hook 上下文日志纳入调试开关**：`[Profiler] WebGL Hook 已挂载` 与上下文获取提示改为仅在 `window.__MCP_DEBUG__ = true` 时输出，不再出现在默认控制台。
+- **依赖恢复与重新构建**：补齐缺失的 `typescript` / `esbuild` 开发依赖后重新构建探针，验证默认启动控制台输出为 0 条。
+
+---
+
 ## [Unreleased] - 2026-10-30
 
 ### 🐛 缺陷修复
 
 - **修复部分项目 cc.Mask 遮罩子节点整体消失 / 露出白底 (Fix Mask Broken by Early WebGL Context Creation)**
   **问题**：探针在 `DOMContentLoaded` 阶段执行性能统计初始化时，会直接调用 `canvas.getContext('webgl')`。WebGL 上下文属性只在「首次创建」时生效，此时默认 `stencil: false`；引擎随后在 `window.onload` 中带 `{ stencil: true }` 调用 `getContext` 只能取回这份已存在的上下文，属性被忽略。`cc.Mask` 完全依赖模板测试，模板缓冲缺失后遮罩写入失效、子节点被整体裁掉，露出父级白色底（普通浏览器预览没有探针注入，因此正常）。
-  **方案**：探针不再主动创建 WebGL 上下文，改为只复用引擎已创建的上下文（`cc.game._renderContext`），或在探针早于引擎执行时通过 `HTMLCanvasElement.prototype.getContext` 旁路捕获引擎自己创建的那一份上下文；等待超过 5 秒仍无上下文时仅打印提示，不降级创建。顺带补充了上下文属性（stencil/alpha/premultipliedAlpha）与来源日志。
+  **方案**：探针不再主动创建 WebGL 上下文，改为只复用引擎已创建的上下文（`cc.game._renderContext`），或在探针早于引擎执行时通过 `HTMLCanvasElement.prototype.getContext` 旁路捕获引擎自己创建的那一份上下文；等待超过 5 秒仍无上下文时仅以调试日志提示，不降级创建。顺带补充了上下文属性（stencil/alpha/premultipliedAlpha）与来源日志。
 
 ### 🔍 诊断能力
 
 - **新增遮罩诊断模块 (Mask Diagnostics)**：对 `cc.Mask` 的模板缓冲链路做只读旁路观测，不修改任何渲染状态。
-  - 启动后自动上报一次诊断摘要与异常告警：上下文真实属性、`STENCIL_BITS`、上下文来源、每帧 stencil 调用次数、场景内全部 Mask 的类型（RECT/ELLIPSE/IMAGE_STENCIL）、inverted、alphaThreshold、嵌套层数、材质完整性、IMAGE_STENCIL 贴图与材质是否一致、Mask 是否与渲染组件同节点、相机分组可见性等。
-  - 自动告警覆盖：上下文 `stencil=false` / `STENCIL_BITS=0` / 非 WebGL 渲染模式 / 有 Mask 但整帧无 stencil 调用 / 疑似写入位与测试位不匹配 / Mask 材质缺失（Error 9000 类）/ IMAGE_STENCIL 无贴图或贴图未加载。
+  - 按需输出诊断报告（默认静默）：上下文真实属性、`STENCIL_BITS`、上下文来源、每帧 stencil 调用次数、场景内全部 Mask 的类型（RECT/ELLIPSE/IMAGE_STENCIL）、inverted、alphaThreshold、嵌套层数、材质完整性、IMAGE_STENCIL 贴图与材质是否一致、Mask 是否与渲染组件同节点、相机分组可见性等。
+  - 报告内置告警判定：上下文 `stencil=false` / `STENCIL_BITS=0` / 非 WebGL 渲染模式 / 有 Mask 但整帧无 stencil 调用 / 疑似写入位与测试位不匹配 / Mask 材质缺失（Error 9000 类）/ IMAGE_STENCIL 无贴图或贴图未加载。
   - 游戏 DevTools 控制台可执行 `__mcpMaskDiag()` 取完整报告，`__mcpGLHookStatus()` 查看 Hook 状态，`__mcpDisableGLHooks()` 一键还原全部 WebGL Hook 用于 A/B 排查（若还原后遮罩立即恢复，即可确认问题出在 WebGL 包装层）。
 
 ---

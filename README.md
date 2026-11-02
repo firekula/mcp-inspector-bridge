@@ -211,7 +211,7 @@ npm run build
 
 ### 🧯 遮罩 (Mask) 异常排查
 
-`cc.Mask` 依赖 WebGL 模板缓冲（stencil）。若面板中遮罩下的子节点整体消失、露出白色底，请在游戏 DevTools 控制台使用以下命令：
+`cc.Mask` 依赖 WebGL 模板缓冲（stencil）。若面板中遮罩下的子节点整体消失、露出白色底，请在游戏 DevTools 控制台使用以下命令（诊断默认静默，只有手动调用时才输出）：
 
 | 命令 | 作用 |
 |------|------|
@@ -219,8 +219,8 @@ npm run build
 | `__mcpGLHookStatus()` | 查看 WebGL Hook 状态、上下文来源与真实属性 |
 | `__mcpDisableGLHooks()` | 一键还原全部 WebGL Hook（A/B 排查：若还原后遮罩立即恢复，说明问题出在 WebGL 包装层） |
 
-探针启动后也会自动向控制台上报一次摘要与告警（前缀 `[McpMaskDiag]`），常见告警包括：上下文 `stencil=false`、`STENCIL_BITS=0`、有 Mask 但整帧无 stencil 调用、Mask 材质缺失、`IMAGE_STENCIL` 贴图未加载或与材质不一致等。
-探针本身不会主动创建 WebGL 上下文，只复用引擎创建的上下文，避免抢占上下文属性导致模板缓冲丢失。
+报告中的告警覆盖：上下文 `stencil=false`、`STENCIL_BITS=0`、有 Mask 但整帧无 stencil 调用、Mask 材质缺失、`IMAGE_STENCIL` 贴图未加载或与材质不一致、Mask 与渲染组件同节点、相机分组不可见等。
+探针本身不会主动创建 WebGL 上下文，只复用引擎创建的上下文，避免抢占上下文属性导致模板缓冲丢失。需要查看探针底层日志时设置 `window.__MCP_DEBUG__ = true`。
 
 ---
 
